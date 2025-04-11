@@ -140,3 +140,29 @@ uint8_t CommandBuffer_GetCommand(uint8_t *command) {
     return length;
   }
 }
+
+// 大数据分片封包函数
+int    packet_fragment(uint8_t *input, int total_len, SerialPacket *output)
+{
+    int packet_count = 0;
+    uint16_t pid = get_next_packet_id();
+
+    for (int i = 0; i < total_len; i += 194)
+    {
+        SerialPacket *pkt = &output[packet_count++];
+
+        pkt->start_flag = 0xAA;
+        pkt->packet_id = pid++;
+        pkt->data_len = MIN(194, total_len - i);
+
+        // 设置分片标志
+        if (i == 0)
+            pkt->ctrl_flags |= FLAG_FRAG_START;
+        if (i + 194 >= total_len)
+            pkt->ctrl_flags |= FLAG_FRAG_END;
+
+        memcpy(pkt->data, input + i, pkt->data_len);
+        pkt->crc16 = calc_crc16(pkt, sizeof(SerialPacket) - 2);
+    }
+    return packet_count;
+}
