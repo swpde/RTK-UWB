@@ -141,7 +141,7 @@ uint8_t CommandBuffer_GetCommand(uint8_t *command) {
   }
 }
 
-// 大数据分片封包函数1231321
+// 大数据分片封包函数123132154654365
 int    packet_fragment(uint8_t *input, int total_len, SerialPacket *output)
 {
     int packet_count = 0;
