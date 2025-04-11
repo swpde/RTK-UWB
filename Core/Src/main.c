@@ -149,7 +149,14 @@ int main(void) {
     int num = 0;
 
     char buf[12];
-    uint8_t send_data[] = "hhhhhhhhhhhhhh";
+    uint8_t send_data[] = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+                          "01234567890123456789012345678901234567890123456789012345";
+    uint8_t output_data[] = {0};
 
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, 2000);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, 2000);
@@ -159,6 +166,11 @@ int main(void) {
 
 // 使用Ex函数，接收不定长数据
     HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
+
+
+
+    uint8_t command[30];
+
 // 关闭DMA传输过半中断（HAL库默认开启，但我们只需要接收完成中断）
     // __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
 
@@ -173,18 +185,57 @@ int main(void) {
 
         /* USER CODE BEGIN 3 */
 
+// 预计算所需封包数
+        const int num_packets = (sizeof (send_data) + 199) / 200;
+        SerialPacket packets[num_packets];
+        Command_Send_Data(send_data,sizeof (send_data),packets);
+        HAL_UART_Transmit_DMA(&huart2, packets, sizeof (packets));
+
+
+        // 从命令缓冲区获取命令
+//        uint8_t length = CommandBuffer_GetCommand(command);
+//        if (length > 0)
+//        {
+//
+//
+//            HAL_UART_Transmit_DMA(&huart3, command, length);
+//            for (int i = 2; i < length - 1; i += 2)
+//            {
+//                GPIO_PinState state = GPIO_PIN_SET;
+//                // 先判断第二个字节，是开灯还是关灯，0x00关灯，0x01开灯
+//                if (command[i + 1] == 0x00)
+//                {
+//                    state = GPIO_PIN_RESET;
+//                }
+//                // 再判断第一个字节，是红灯还是绿灯还是蓝灯
+//                if (command[i] == 0x01) // 红灯
+//                {
+//                    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);
+//                }
+//                else if (command[i] == 0x02) // 绿灯
+//                {
+//                    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, state);
+//                }
+//                else if (command[i] == 0x03) // 蓝灯
+//                {
+//                    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, state);
+//                }
+//            }
+//        }
+        /* USER CODE END WHILE */
+
+        /* USER CODE BEGIN 3 */
+
+
+
+
+
+
         sprintf(buf, "%d", num);
-
-//        HAL_UART_Transmit_DMA(&huart3, buf, sizeof (buf));
-//        HAL_UART_Transmit_DMA(&huart2, buf, sizeof (buf));
-//        HAL_UART_Transmit_DMA(&huart4, buf, sizeof (buf));
-
         OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
         HAL_Delay(500);
         HAL_Delay(500);
 
-        HAL_Delay(500);
-        HAL_Delay(500);
     }
     /* USER CODE END 3 */
 }
@@ -286,6 +337,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
         //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
 
         HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
+//        send_data(uint8_t *input, int Size, SerialPacket *output);
+//
+//        send_data(uint8_t *data, uint32_t len)
+
 
         num_lc29++;
         sprintf(buf, "%d", num_lc29);
