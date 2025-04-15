@@ -50,7 +50,7 @@ include_directories(Core/Inc Drivers/STM32G0xx_HAL_Driver/Inc Drivers/STM32G0xx_
 
 add_definitions(-DUSE_HAL_DRIVER -DSTM32G070xx)
 
-file(GLOB_RECURSE SOURCES "startup/*.*" "Drivers/*.*" "Core/*.*" "Core/Src/*.*" )
+file(GLOB_RECURSE SOURCES "startup/*.*" "Drivers/*.*" "Core/*.*" "Core/Src/*.*"   )
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32G070CBTx_FLASH.ld)
 

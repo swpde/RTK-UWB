@@ -18,6 +18,9 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <string.h>
+#include <ringbuff.h>
+#include <stdbool.h>
 #include "main.h"
 #include "dma.h"
 #include "usart.h"
@@ -27,7 +30,7 @@
 /* USER CODE BEGIN Includes */
 #include "oled.h"
 #include "stdio.h"
-#include "Data_Cache.h"
+//#include "Data_Cache.h"
 
 /* USER CODE END Includes */
 
@@ -57,19 +60,24 @@ uint8_t Uart3_RxBuff[2000] = {0};        //数据数据
 uint8_t Uart3_Rx_Cnt = 0;        //长度
 uint8_t Uart4_RxBuff[100];        //数据数据
 uint8_t Uart4_Rx_Cnt = 0;        //长度
+//uint8_t Command_Handle_Buff[2000] = {0};        //数据数据
+
+
+static char main_buf[2000];
 
 
 int num_4g = 0;
 int num_lc29 = 0;
 
-extern DMA_HandleTypeDef hdma_usart2_rx;
-extern DMA_HandleTypeDef hdma_usart2_tx;
-extern DMA_HandleTypeDef hdma_usart3_rx;
-extern DMA_HandleTypeDef hdma_usart3_tx;
-extern DMA_HandleTypeDef hdma_usart4_rx;
-extern DMA_HandleTypeDef hdma_usart4_tx;
 
 extern unsigned char uart1_getok, uart2_getok, uart3_getok;
+
+struct {
+    uint8_t Receive_End;
+    uint8_t Receive_Start;
+    uint8_t Receive_Count;
+    uint16_t Receive_last_length;
+} Receive_Handle;
 extern unsigned int DMArx_len;
 //GPS模块的经纬度数据值
 struct {
@@ -90,6 +98,38 @@ struct {
     char GGAdata[100];
 //char ALLNEMAdata[2000];
 } LongLatidata;
+//#pragma  pack (1)
+struct ringbuff my_ringbuff = {
+        main_buf,
+        sizeof(main_buf),
+        0,
+        0,
+        0,
+        0, 0, 0
+
+};
+//#pragma pack ()
+
+#ifdef __GNUC__
+/* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
+   set to 'Yes') calls __io_putchar() */
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif /* __GNUC__ */
+/**
+  * @brief  Retargets the C library printf function to the USART.
+  * @param  None
+  * @retval None
+  */
+PUTCHAR_PROTOTYPE {
+/* Place your implementation of fputc here */
+/* e.g. write a character to the EVAL_COM1 and Loop until the end of transmission */
+    HAL_UART_Transmit(&huart2, (uint8_t *) &ch, 1, 0xFFFF);
+    return ch;
+}
+
+
 
 /* USER CODE END PV */
 
@@ -103,6 +143,10 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
+
+void ring_buff_v1(uint8_t *command);
+
+void ring_buff_v2(struct ringbuff *my_ringbuff, const char *msg, int i);
 
 /**
   * @brief  The application entry point.
@@ -147,15 +191,13 @@ int main(void) {
     //HAL_UART_Receive_DMA(&huart2, Uart2_RxBuff, 200);
 
     int num = 0;
+    int num2 = 0;
 
-    char buf[12];
-    uint8_t send_data[] = "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
-                          "01234567890123456789012345678901234567890123456789012345";
+    char buf[3];
+    char buf2[12] = {0};
+    bool send_mirror= true ;
+
+    uint8_t send_data[]= {0} ;
     uint8_t output_data[] = {0};
 
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, 2000);
@@ -169,7 +211,6 @@ int main(void) {
 
 
 
-    uint8_t command[30];
 
 // 关闭DMA传输过半中断（HAL库默认开启，但我们只需要接收完成中断）
     // __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
@@ -180,65 +221,71 @@ int main(void) {
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
-        num++;
+
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
 
 // 预计算所需封包数
-        const int num_packets = (sizeof (send_data) + 199) / 200;
-        SerialPacket packets[num_packets];
-        Command_Send_Data(send_data,sizeof (send_data),packets);
-        HAL_UART_Transmit_DMA(&huart2, packets, sizeof (packets));
+//        const int num_packets = (sizeof (send_data) + 199) / 200;
+//        SerialPacket packets[num_packets];
+//        Command_Send_Data(send_data,sizeof (send_data),packets);
+//        HAL_UART_Transmit_DMA(&huart2, packets, sizeof (packets));
+
+//        ring_buff_v1(command);
 
 
-        // 从命令缓冲区获取命令
-//        uint8_t length = CommandBuffer_GetCommand(command);
-//        if (length > 0)
-//        {
-//
-//
-//            HAL_UART_Transmit_DMA(&huart3, command, length);
-//            for (int i = 2; i < length - 1; i += 2)
-//            {
-//                GPIO_PinState state = GPIO_PIN_SET;
-//                // 先判断第二个字节，是开灯还是关灯，0x00关灯，0x01开灯
-//                if (command[i + 1] == 0x00)
-//                {
-//                    state = GPIO_PIN_RESET;
-//                }
-//                // 再判断第一个字节，是红灯还是绿灯还是蓝灯
-//                if (command[i] == 0x01) // 红灯
-//                {
-//                    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, state);
-//                }
-//                else if (command[i] == 0x02) // 绿灯
-//                {
-//                    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, state);
-//                }
-//                else if (command[i] == 0x03) // 蓝灯
-//                {
-//                    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, state);
-//                }
-//            }
-//        }
+        if (Receive_Handle.Receive_End == 1) {
+//            uint16_t lenght = 200 * Receive_Handle.Receive_Count + Receive_Handle.Receive_last_length;
+
+//            printf("#################   读取  读取 开始 读取  读取 #####################\n");
+//            ringbuff_debug(&my_ringbuff);
+            uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
+//            printf("长度 %d ###\n",lenght);
+
+//            ringbuff_debug(&my_ringbuff);
+//            printf("#################   读取  读取 结束 读取  读取 #####################\n");
+
+
+            if (send_mirror)
+            {//            printf(main_buf);
+                int num_packets = ((lenght) + 194) / 195;
+//                SerialPacket packets[num_packets];
+                Command_Send_Data_t(main_buf, num_packets, lenght);
+
+                HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
+
+//                HAL_UART_Transmit_DMA(&huart2, main_buf, lenght);
+
+
+            }
+            send_mirror= !send_mirror;
+            Receive_Handle.Receive_End = 0;
+            Receive_Handle.Receive_Count = 0;
+            Receive_Handle.Receive_last_length = 0;
+
+        }
+
+
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
-
-
-
-
-
-
+        num++;
         sprintf(buf, "%d", num);
         OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
-        HAL_Delay(500);
-        HAL_Delay(500);
+//        HAL_Delay(500);
+        HAL_Delay(750);
+
+//        ringbuff_getdata(&my_ringbuff, main_buf, ringbuff_data_len(&my_ringbuff));
+//
+//        HAL_UART_Transmit_DMA(&huart2, main_buf, ringbuff_data_len(&my_ringbuff));
 
     }
     /* USER CODE END 3 */
 }
+
+
+
 
 /**
   * @brief System Clock Configuration
@@ -319,37 +366,69 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 
 
     char buf[12];
-    if (huart == &huart2) {
-        //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-//        HAL_UART_Transmit_DMA(&huart2, Uart2_RxBuff, Size);
+    char buf2[12];
 
-        HAL_UART_Transmit_DMA(&huart4, Uart2_RxBuff, Size);
+    //串口2接收回调函数（LORA回传差分信息 需要对数据进行解包）
+//    if (huart == &huart2) {
+//
+////        uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
+//        ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
+//
+////        如果收到了结束位，开始解析数据
+//        if (Uart2_RxBuff[1] == 0x34) {
+//            //数据长度错误
+//            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
+//                Receive_Handle.Receive_Count = 0;
+//                Receive_Handle.Receive_last_length = 0;
+//                Receive_Handle.Receive_End = 0;
+//            }
+//            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
+//            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
+//            Receive_Handle.Receive_End = 1;
+//        } else {
+//            Receive_Handle.Receive_Count++;
+//        }
+////        ringbuff_getdata(&my_ringbuff,buf2,12);
+////        HAL_UART_Transmit_DMA(&huart2,buf2,sizeof (buf2));
+//
+////        HAL_UART_Transmit_DMA(&huart4, Uart2_RxBuff, Size);
+//
+//        num_4g++;
+//        sprintf(buf, "%d", num_4g);
+//        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
+//
+//        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
+//        __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+//
+//    }
+    if (huart == &huart3)
+        if (Size != 0) {
+            {
+                //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
+//                printf("#################   写入  写入 开始 写入  写入 #####################\n");
+//                ringbuff_debug(&my_ringbuff);
+//                printf("写入 %hu\n",Size);
+                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
+//                ringbuff_debug(&my_ringbuff);
+//                printf("#################   写入  写入 结束 写入  写入 #####################\n");
 
-        num_4g++;
-        sprintf(buf, "%d", num_4g);
-        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
-
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
-        __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
-
-    }
-    if (huart == &huart3) {
-        //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-
-        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
+                Receive_Handle.Receive_End = 1;
+//        printf(Uart3_RxBuff);
+//        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
 //        send_data(uint8_t *input, int Size, SerialPacket *output);
 //
 //        send_data(uint8_t *data, uint32_t len)
 
 
-        num_lc29++;
-        sprintf(buf, "%d", num_lc29);
-        OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
+                num_lc29++;
+                sprintf(buf, "%d", num_lc29);
+                OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
 
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
-        __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+                HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
+                __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
 
-    }
+            }
+        }
 //    if (huart == &huart4) {
 //        //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
 //
