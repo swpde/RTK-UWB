@@ -1,4 +1,15 @@
 
+/**
+ * **************************************************************
+ * @file        : ringbuff.c
+ * @author      : swp
+ * @date        :4/14
+ * @brief       : 利用循环缓冲区实现指令数据缓存
+ * **************************************************************
+ * @details
+ *
+ *
+ */
 #include "ringbuff.h"
 #include <assert.h>
 #include <stddef.h>
@@ -263,7 +274,7 @@ uint8_t Command_Send_Data(uint8_t *send_data, uint8_t packets_num, int total_len
     return packet_count;
 }
 
-
+//发送所有数据
 uint8_t Command_Send_Data_t(uint8_t *send_data, uint8_t packets_num, uint16_t total_len) {
     uint8_t packet_count = 0;
     uint8_t pid = 0;
