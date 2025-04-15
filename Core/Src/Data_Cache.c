@@ -16,18 +16,15 @@
 #define COMMAND_MIN_LENGTH 4
 
 // 循环缓冲区大小
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 2000
 // 循环缓冲区
-static uint8_t buffer[BUFFER_SIZE];
+static uint16_t buffer[BUFFER_SIZE];
 // 循环缓冲区读索引
 static uint8_t readIndex = 0;
 // 循环缓冲区写索引
 static uint8_t writeIndex = 0;
 
-#define FLAG_SYN (1 << 0)        // 建立连接
-#define FLAG_FRAG_START (1 << 1) // 分片开始
-#define FLAG_FRAG_END (1 << 2)   // 分片结束
-#define FLAG_FIN (1 << 3)        // 结束连接
+
 
 
 
@@ -57,7 +54,7 @@ uint8_t CommandBuffer_Read(uint8_t i) {
  * @retval 1~BUFFER_SIZE-1 未处理的数据长度
  * @retval BUFFER_SIZE 缓冲区已满
  */
-uint8_t CommandBuffer_GetLength() {
+uint16_t CommandBuffer_GetLength() {
   // 读索引等于写索引时，缓冲区为空
   if (readIndex == writeIndex) {
     return 0;
@@ -125,58 +122,61 @@ uint8_t CommandBuffer_GetCommand(uint8_t *command) {
       CommandBuffer_AddReadIndex(1);
       continue;
     }
-    // 如果缓冲区长度小于指令长度 则不可能有完整的指令
-    uint8_t length = CommandBuffer_Read(readIndex + 1);
-    if (CommandBuffer_GetLength() < length) {
-      return 0;
-    }
-    // 如果校验和不正确 则跳过 重新开始寻找
-    uint8_t sum = 0;
-    for (uint8_t i = 0; i < length - 1; i++) {
-      sum += CommandBuffer_Read(readIndex + i);
-    }
-    if (sum != CommandBuffer_Read(readIndex + length - 1)) {
-      CommandBuffer_AddReadIndex(1);
-      continue;
-    }
+//    // 如果缓冲区长度小于指令长度 则不可能有完整的指令
+//    uint8_t length = CommandBuffer_Read(readIndex + 1);
+//    if (CommandBuffer_GetLength() < length) {
+//      return 0;
+//    }
+//    // 如果校验和不正确 则跳过 重新开始寻找
+//    uint8_t sum = 0;
+//    for (uint8_t i = 0; i < length - 1; i++) {
+//      sum += CommandBuffer_Read(readIndex + i);
+//    }
+//    if (sum != CommandBuffer_Read(readIndex + length - 1)) {
+//      CommandBuffer_AddReadIndex(1);
+//      continue;
+//    }
     // 如果找到完整指令 则将指令写入command 返回指令长度
-    for (uint8_t i = 0; i < length; i++) {
-      command[i] = CommandBuffer_Read(readIndex + i);
-    }
-    CommandBuffer_AddReadIndex(length);
-    return length;
+//    for (uint8_t i = 0; i < length; i++) {
+//      command[i] = CommandBuffer_Read(readIndex + i);
+//    }
+//    CommandBuffer_AddReadIndex(length);
+//    return length;
   }
 }
 
 // 大数据分片封包函数
 // 起始标志(0xAA)// 控制位// 包序列号 // 数据长度 // 数据载荷    // CRC16校验
-uint8_t Command_Send_Data(uint8_t *input, int total_len, SerialPacket *output)
-{
-    uint8_t packet_count = 0;
-    uint8_t pid = 0;
+//uint8_t Command_Send_Data(uint8_t *input, int total_len, SerialPacket *output)
+//{
+//    uint8_t packet_count = 0;
+//    uint8_t pid = 0;
+//
+//    for (int i = 0; i < total_len; i += 200)
+//    {
+//
+//
+//        SerialPacket *pkt = &output[packet_count++];
+//
+//        pkt->ctrl_flags = 0;
+//        pkt->start_flag = 0xAA;
+//        pkt->packet_id = pid++;
+//        pkt->data_len = fmin(200, total_len - i);
+//
+//        // 设置分片标志
+//        if (i == 0)
+//            pkt->ctrl_flags |= FLAG_FRAG_START;
+//        if (i + 200 >= total_len)
+//            pkt->ctrl_flags |= FLAG_FRAG_END;
+//
+//        memcpy(pkt->data, input + i, pkt->data_len);
+////        pkt->crc16 = calc_crc16(pkt, sizeof(SerialPacket) - 2);
+//    }
+//    return packet_count;
+//}
 
-    for (int i = 0; i < total_len; i += 200)
-    {
 
 
-        SerialPacket *pkt = &output[packet_count++];
-
-        pkt->ctrl_flags = 0;
-        pkt->start_flag = 0xAA;
-        pkt->packet_id = pid++;
-        pkt->data_len = fmin(200, total_len - i);
-
-        // 设置分片标志
-        if (i == 0)
-            pkt->ctrl_flags |= FLAG_FRAG_START;
-        if (i + 200 >= total_len)
-            pkt->ctrl_flags |= FLAG_FRAG_END;
-
-        memcpy(pkt->data, input + i, pkt->data_len);
-//        pkt->crc16 = calc_crc16(pkt, sizeof(SerialPacket) - 2);
-    }
-    return packet_count;
-}
 
 uint16_t calc_crc16(const void* data, size_t len) {
     uint16_t crc = 0xFFFF;
@@ -187,4 +187,30 @@ uint16_t calc_crc16(const void* data, size_t len) {
             crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
     }
     return crc;
+}
+
+
+//
+uint8_t Command_Handle_Data(uint8_t *data, uint8_t length) {
+    // 如果不是包头 则跳过
+    if (data[0] != 0xAA)         return 0;
+
+
+    data[0];
+    memcpy(data, data,data[3] );
+
+//    Command_Handle_Buff[0]=0;
+
+//    Command_Handle_Buff
+    // 使用memcpy函数将数据写入缓冲区
+    if (writeIndex + length <= BUFFER_SIZE) {
+        memcpy(buffer + writeIndex, data, length);
+        writeIndex += length;
+    } else {
+        uint8_t firstLength = BUFFER_SIZE - writeIndex;
+        memcpy(buffer + writeIndex, data, firstLength);
+        memcpy(buffer, data + firstLength, length - firstLength);
+        writeIndex = length - firstLength;
+    }
+    return length;
 }
