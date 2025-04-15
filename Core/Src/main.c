@@ -242,16 +242,15 @@ int main(void) {
 //            ringbuff_debug(&my_ringbuff);
             uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
 //            printf("长度 %d ###\n",lenght);
-
 //            ringbuff_debug(&my_ringbuff);
 //            printf("#################   读取  读取 结束 读取  读取 #####################\n");
-
 
             if (send_mirror)
             {//            printf(main_buf);
                 int num_packets = ((lenght) + 194) / 195;
 //                SerialPacket packets[num_packets];
-                Command_Send_Data_t(main_buf, num_packets, lenght);
+                Command_Send_Data(main_buf, lenght,200);
+//                Command_Send_Data_t(main_buf, num_packets, lenght);
 
                 HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
 
@@ -342,65 +341,45 @@ void SystemClock_Config(void) {
 
 /* USER CODE BEGIN 4 */
 
-//串口发送完成回调函数
-/*
- *
- * */
-//void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-//    if (huart == &huart2) {
-//
-//        HAL_UART_Transmit_DMA(&huart2, Uart2_RxBuff, 200);
-//
-//        HAL_UART_Receive_DMA(&huart2, Uart2_RxBuff, 200);
-//
-//    }
-//
-//}
+
 
 //串口空闲中断回调函数
-/*
- *
- * Size
- * */
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
-
-
     char buf[12];
     char buf2[12];
-
     //串口2接收回调函数（LORA回传差分信息 需要对数据进行解包）
-//    if (huart == &huart2) {
-//
-////        uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-//        ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
-//
-////        如果收到了结束位，开始解析数据
-//        if (Uart2_RxBuff[1] == 0x34) {
-//            //数据长度错误
-//            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
-//                Receive_Handle.Receive_Count = 0;
-//                Receive_Handle.Receive_last_length = 0;
-//                Receive_Handle.Receive_End = 0;
-//            }
-//            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
-//            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
-//            Receive_Handle.Receive_End = 1;
-//        } else {
-//            Receive_Handle.Receive_Count++;
-//        }
-////        ringbuff_getdata(&my_ringbuff,buf2,12);
-////        HAL_UART_Transmit_DMA(&huart2,buf2,sizeof (buf2));
-//
-////        HAL_UART_Transmit_DMA(&huart4, Uart2_RxBuff, Size);
-//
-//        num_4g++;
-//        sprintf(buf, "%d", num_4g);
-//        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
-//
-//        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
-//        __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
-//
-//    }
+    if (huart == &huart2) {
+
+//        uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
+        ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
+
+//        如果收到了结束位，开始解析数据
+        if (Uart2_RxBuff[1] == 0x34) {
+            //数据长度错误
+            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
+                Receive_Handle.Receive_Count = 0;
+                Receive_Handle.Receive_last_length = 0;
+                Receive_Handle.Receive_End = 0;
+            }
+            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
+            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
+            Receive_Handle.Receive_End = 1;
+        } else {
+            Receive_Handle.Receive_Count++;
+        }
+//        ringbuff_getdata(&my_ringbuff,buf2,12);
+//        HAL_UART_Transmit_DMA(&huart2,buf2,sizeof (buf2));
+
+//        HAL_UART_Transmit_DMA(&huart4, Uart2_RxBuff, Size);
+
+        num_4g++;
+        sprintf(buf, "%d", num_4g);
+        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
+
+        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
+        __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+
+    }
     if (huart == &huart3)
         if (Size != 0) {
             {

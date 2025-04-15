@@ -70,7 +70,7 @@ int8_t ringbuff_putdata(ringbuff_t p_rb, uint8_t *data, uint16_t length);
 
 uint16_t ringbuff_getdata_all(ringbuff_t p_rb, uint8_t *data);
 
-uint8_t Command_Send_Data(uint8_t *input, uint8_t packets_num, int total_len) ;
+uint8_t Command_Send_Data(uint8_t *send_data,  uint16_t total_len,uint16_t chunk_len) ;
 uint8_t Command_Send_Data_t(uint8_t *send_data, uint8_t packets_num, uint16_t total_len) ;
 
 

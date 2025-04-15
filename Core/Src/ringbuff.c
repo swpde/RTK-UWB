@@ -228,49 +228,38 @@ int32_t ringbuff_peekchar(ringbuff_t p_rb, uint8_t *ch) {
  * @brief 由于lora限制单包数据不能超过260字节，否则会丢包，
  *         所以将发送数据拆包
  * @param send_data 要传入的数据指针
- * @param packets_num 总包数
  * @param total_len 要写入的数据总长度
- * @param length 要写入的数据长度
+ * @param chunk_len 每组长度
  * @param outputoutput 输出数据指针
  * @return
  */
-uint8_t Command_Send_Data(uint8_t *send_data, uint8_t packets_num, int total_len) {
+uint8_t Command_Send_Data(uint8_t *send_data, uint16_t total_len, uint16_t chunk_len) {
     uint8_t packet_count = 0;
     uint8_t pid = 0;
+    uint16_t remaining = 0;
+    uint16_t chunk_size = chunk_len-5;   // 每组大小
+    uint16_t num_chunks = (total_len + chunk_size - 1) / chunk_size;
 
-    for (int i = 0; i < total_len; i += 195) {
+    for (uint8_t i = 0; i < (uint8_t)num_chunks; i++) {
+        uint16_t start = i * chunk_size;
+        remaining = total_len - start;
+        uint16_t copy_size = (remaining < chunk_size) ? remaining : chunk_size;
 
-        uint8_t pkt[200];
-//        SerialPacket pkt;
 
-        pkt[1] = 0;
+        uint8_t pkt[chunk_len];
         pkt[0] = 0x6B;
-        pkt[2] = packets_num;
+        if (i == 0) pkt[1]= 0x02;
+        else if (i + 1 == num_chunks) pkt[1] =0x04;
+        else pkt[1] = 0;
+        pkt[2] = num_chunks;
         pkt[3] = pid++;
-        pkt[4] = fmin(195, total_len - i);
-
-        // 设置分片标志 起始位
-        if (i == 0) {
-            pkt[1] |= FLAG_FRAG_START;
-            memcpy(pkt + 5, send_data + i, pkt[4]);
-        }
-            // 结束位
-        else if (i + 195 >= total_len) {
-            pkt[1] |= FLAG_FRAG_END;
-            memcpy(pkt + 5, send_data + i, pkt[4]);
-            memset(pkt + 5 + pkt[4], 0, 195 - (pkt[4]));  //空余数位清零
-        }
-            //中间位
-        else {
-            memcpy(pkt + 5, send_data + i, pkt[4]);
-        }
-//        while(HAL_DMA_GetState(&huart2) == 0x02U)
-        HAL_Delay(60);
-//        printf(pkt);
-        HAL_UART_Transmit_DMA(&huart2, pkt, pkt[4]);
-
-        //        pkt->crc16 = calc_crc16(pkt, sizeof(SerialPacket) - 2);
+        pkt[4] = copy_size;
+        // 安全复制数据
+        memcpy(pkt + 5, send_data + start, copy_size);
+        HAL_UART_Transmit(&huart2, pkt, copy_size+5, 100);
+        HAL_Delay(100);
     }
+
     return packet_count;
 }
 
@@ -278,52 +267,25 @@ uint8_t Command_Send_Data(uint8_t *send_data, uint8_t packets_num, int total_len
 uint8_t Command_Send_Data_t(uint8_t *send_data, uint8_t packets_num, uint16_t total_len) {
     uint8_t packet_count = 0;
     uint8_t pid = 0;
-    uint8_t  pkt[200] = {0};
+    uint8_t pkt[200] = {0};
 
-     uint16_t total_size = total_len;   // 总数据长度
-     uint16_t chunk_size = 200;   // 每组大小
-//    uint8_t send_data[total_size];   // 假设数据已初始化
-
+    uint16_t total_size = total_len;   // 总数据长度
+    uint16_t chunk_size = 200;   // 每组大小
     uint16_t num_chunks = (total_size + chunk_size - 1) / chunk_size;
 
     for (uint8_t i = 0; i < num_chunks; i++) {
-        uint16_t  start = i * chunk_size;
+        uint16_t start = i * chunk_size;
         uint16_t remaining = total_size - start;
         uint16_t copy_size = (remaining < chunk_size) ? remaining : chunk_size;
 
-        // 动态分配内存存储当前组
-//        uint8_t *pkt = (uint8_t*)malloc(copy_size);
-//        if (!pkt) {
-//            perror("内存分配失败");
-//            break;
-//        }
-
         // 安全复制数据
         memcpy(pkt, send_data + start, copy_size);
-//        for (int a = 0; a < copy_size; a++) {
-//            printf("%s ", pkt);
-//        }
-
-        HAL_UART_Transmit(&huart2, pkt, copy_size,100);
+        HAL_UART_Transmit(&huart2, pkt, copy_size, 100);
         HAL_Delay(100);
-
-        // 示例操作：打印长度（实际使用中处理数据）
-//        printf("第%zu组长度: %zu\n", i+1, copy_size);
-
     }
-
-
-//    for (uint8_t i = 0; i * 200 < total_len; i++) {
-//
-//
-//
-
-//        memcpy(pkt, send_data + i * 200, 200);
-//        HAL_UART_Transmit_DMA(&huart2, pkt, 200);
-//        HAL_Delay(100);
-//    }
     return packet_count;
 }
+
 
 void ringbuff_debug(ringbuff_t p_rb) {
 //    printf("*************ringbuff debug***********************\n");
