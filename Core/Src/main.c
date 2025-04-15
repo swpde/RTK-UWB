@@ -194,7 +194,7 @@ int main(void) {
     //HAL_UART_Receive_DMA(&huart2, Uart2_RxBuff, 200);
 
     int num = 0;
-    int num2 = 0;
+    int num2 = 0;//
 
     char buf[3];
     char buf2[12] = {0};
