@@ -63,7 +63,7 @@ uint8_t Uart4_Rx_Cnt = 0;        //长度
 //uint8_t Command_Handle_Buff[2000] = {0};        //数据数据
 
 
-static char main_buf[2000];
+static uint8_t main_buf[2000];
 
 
 int num_4g = 0;
@@ -77,6 +77,7 @@ struct {
     uint8_t Receive_Start;
     uint8_t Receive_Count;
     uint16_t Receive_last_length;
+    uint8_t uart3_getok;
 } Receive_Handle;
 extern unsigned int DMArx_len;
 //GPS模块的经纬度数据值
@@ -201,6 +202,7 @@ int main(void) {
 
     uint8_t send_data[] = {0};
     uint8_t output_data[] = {0};
+    uint8_t send_Lati_data[200];
 
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, 2000);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, 2000);
@@ -242,9 +244,10 @@ int main(void) {
             uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
 
             Command_Analysis_Data(main_buf, lenght, Receive_Handle.Receive_last_length);
-//            HAL_UART_Transmit_DMA(&huart3, main_buf, lenght);
-
-            HAL_UART_Transmit(&huart3, main_buf, lenght, 500);
+//            HAL_UART_Transmit(&huart1, main_buf, lenght,500);
+//            HAL_Delay(50);
+//
+//            HAL_UART_Transmit(&huart3, main_buf, lenght, 500);
 
 
 //基站运行函数
@@ -258,14 +261,40 @@ int main(void) {
         }
 
 
+        if (Receive_Handle.uart3_getok)//gps data is ok
+        {
+
+            {
+                //		memcpy(LongLatidata.ALLNEMAdata,Uart3_RxBuff,Uart3_Rx_Cnt);
+                //LongLatidata.ALLNEMAdata[Uart3_Rx_Cnt]=0;
+//                if (HAL_UART_Transmit(&huart1, (uint8_t *) Uart3_RxBuff, DMArx_len) != HAL_OK)//DMA SEND
+//                {
+//                    Error_Handler();
+//                }
+                Receive_Handle.uart3_getok = 0;
+                Getdata_Change();
+
+                memcpy(send_Lati_data,LongLatidata.TrueLatitude,50);
+                memcpy(send_Lati_data+50,LongLatidata.Truelongitude,50);
+
+                //  Uart3_Rx_Cnt=0;
+//                //	memset(Uart3_RxBuff,0,2000);
+//                HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+//                HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_15);
+            }
+
+        }
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
         num++;
         sprintf(buf, "%d", num);
         OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
-//        HAL_Delay(500);
-        HAL_Delay(750);
+        HAL_Delay(500);
+//        HAL_UART_Transmit(&huart2,send_Lati_data,100,100);
+//        HAL_UART_Transmit(&huart1,send_Lati_data,100,100);
+
+//        HAL_Delay(250);
 
 //        ringbuff_getdata(&my_ringbuff, main_buf, ringbuff_data_len(&my_ringbuff));
 //
@@ -275,25 +304,25 @@ int main(void) {
     /* USER CODE END 3 */
 }
 
-void master(bool send_mirror) {
-
-//            printf("#################   读取  读取 开始 读取  读取 #####################\n");
-//            ringbuff_debug(&my_ringbuff);
-    uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
-//            printf("长度 %d ###\n",lenght);
-//            ringbuff_debug(&my_ringbuff);
-//            printf("#################   读取  读取 结束 读取  读取 #####################\n");
-
-    if (send_mirror) {//            printf(main_buf);
-        int num_packets = ((lenght) + 194) / 195;
-//                SerialPacket packets[num_packets];
-        Command_Send_Data(main_buf, lenght, 200);
-//                Command_Send_Data_t(main_buf, num_packets, lenght);
-
-        HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
-
-    }
-}
+//void master(bool send_mirror) {
+//
+////            printf("#################   读取  读取 开始 读取  读取 #####################\n");
+////            ringbuff_debug(&my_ringbuff);
+//    uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
+////            printf("长度 %d ###\n",lenght);
+////            ringbuff_debug(&my_ringbuff);
+////            printf("#################   读取  读取 结束 读取  读取 #####################\n");
+//
+//    if (send_mirror) {//            printf(main_buf);
+//        int num_packets = ((lenght) + 194) / 195;
+////                SerialPacket packets[num_packets];
+//        Command_Send_Data(main_buf, lenght, 200);
+////                Command_Send_Data_t(main_buf, num_packets, lenght);
+//
+//        HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
+//
+//    }
+//}
 
 
 /**
@@ -355,8 +384,8 @@ void SystemClock_Config(void) {
 
 //串口空闲中断回调函数
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
-    char buf[12];
-    char buf2[12];
+    char buf[3];
+    char buf2[3];
     //串口2接收回调函数（LORA回传差分信息 需要对数据进行解包）
     if (huart == &huart2) {
 
@@ -366,27 +395,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 //        如果收到了结束位，开始解析数据
         if (Uart2_RxBuff[1] == 0x04) {
             //数据长度错误
-//            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
-//                Receive_Handle.Receive_Count = 0;
-//                Receive_Handle.Receive_last_length = 0;
-//                Receive_Handle.Receive_End = 0;
-//            } else
-//            {
             Receive_Handle.Receive_Count = Uart2_RxBuff[2];
             Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
             Receive_Handle.Receive_End = 1;
         }
-//        } else {
-//            Receive_Handle.Receive_Count++;
-//        }
-//        ringbuff_getdata(&my_ringbuff,buf2,12);
-//        HAL_UART_Transmit_DMA(&huart2,buf2,sizeof (buf2));
+//            HAL_UART_Transmit(&huart1, main_buf, Size,500);
 
-//        HAL_UART_Transmit_DMA(&huart4, Uart2_RxBuff, Size);
-
-        num_4g++;
-        sprintf(buf, "%d", num_4g);
-        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
+//        num_4g++;
+//        sprintf(buf, "%d", num_4g);
+//        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
 
         HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
         __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
@@ -399,11 +416,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 //                printf("#################   写入  写入 开始 写入  写入 #####################\n");
 //                ringbuff_debug(&my_ringbuff);
 //                printf("写入 %hu\n",Size);
-                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
+//                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
 //                ringbuff_debug(&my_ringbuff);
 //                printf("#################   写入  写入 结束 写入  写入 #####################\n");
-
-                Receive_Handle.Receive_End = 1;
+                Receive_Handle.uart3_getok = 1;
+//                Receive_Handle.Receive_End = 1;
 //        printf(Uart3_RxBuff);
 //        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
 //        send_data(uint8_t *input, int Size, SerialPacket *output);
@@ -411,9 +428,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 //        send_data(uint8_t *data, uint32_t len)
 
 
-                num_lc29++;
-                sprintf(buf, "%d", num_lc29);
-                OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
+//                num_lc29++;
+//                sprintf(buf, "%d", num_lc29);
+//                OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
 
                 HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
                 __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
@@ -445,7 +462,105 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 //        __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
 //    }
 //}
+/*************将原始数据解析出经纬度数据*******************/
+//$GNGGA,015032.000,3150.303376,N,11707.855089,E,1,22,1.91,197.8,M,-0.3,M,,*6B
+void Getdata_Change(void) {
+    unsigned char i;
+    char *strx;
+    char *p;
+    char json[] = "{lon:%d.%06d:lat:%d.%06d}";
+    memset(LongLatidata.GGAdata, 0, 100);
+    strx = strstr((const char *) Uart3_RxBuff, (const char *) "$GNGGA");//返回$GNGGA
+    if (strx) {
+        for (i = 0;; i++) {
+            if (strx[i + 1] == '$')
+                break;
+            LongLatidata.GGAdata[i] = strx[i];
+        }
+        LongLatidata.GGAdata[i] = 0;
+//        printf(LongLatidata.GGAdata);//mqtt send
+        strx = strstr((const char *) LongLatidata.GGAdata, (const char *) "N,");//返回N，表明经纬度数据被正确获取了
+        if (strx) {
 
+            memcpy(LongLatidata.buffer, LongLatidata.GGAdata, 100);
+            memset(LongLatidata.longitude, 0, 20);
+            memset(LongLatidata.Latitude, 0, 20);
+            memset(LongLatidata.Truelongitude, 0, 50);
+            memset(LongLatidata.TrueLatitude, 0, 50);
+            // printf(LongLatidata.buffer);
+            p = strtok(LongLatidata.buffer, ",");
+            p = strtok(NULL, ",");
+            p = strtok(NULL, ",");
+            // 	// //  Uart1_SendStr(p);
+            memset(LongLatidata.longitude, 0, 11);
+            memcpy(LongLatidata.longitude, p, 11);
+            //  printf(LongLatidata.longitude);
+            p = strtok(NULL, ",");
+            p = strtok(NULL, ",");
+            memset(LongLatidata.Latitude, 0, 13);
+            memcpy(LongLatidata.Latitude, p, 13);
+            //printf(LongLatidata.Latitude);
+            //	Uart1_SendStr(p);
+            strx = strstr((const char *) LongLatidata.GGAdata, (const char *) "E,");//返回E，读取纬度数据11702.5641
+            if (strx) {
+                LongLatidata.RTKflag = strx[2];
+                for (i = 0; i < 3; i++) {
+                    LongLatidata.Latitudess[i] = LongLatidata.Latitude[i];
+                    LongLatidata.TrueLatitude[i] = LongLatidata.Latitude[i];
+                }
+
+                for (i = 3; i < 13; i++)
+                    LongLatidata.Latitudedd[i - 3] = LongLatidata.Latitude[i];
+                LongLatidata.Latitudedd[i - 3] = 0;
+                //LongLatidata.Latitudeddff=atof(LongLatidata.Latitudedd);
+                LongLatidata.Latitudeddff = strtod(LongLatidata.Latitudedd, NULL);
+                LongLatidata.Latitudeddff /= 60;
+                sprintf(LongLatidata.Latitudeddtr, "%0.8f", LongLatidata.Latitudeddff);
+                LongLatidata.Latitudeddtr[10] = 0;
+                for (i = 1; i < 10; i++) {
+                    LongLatidata.TrueLatitude[2 + i] = LongLatidata.Latitudeddtr[i];
+                }
+
+                // sscanf(LongLatidata.Latitudedd,"%lf",&LongLatidata.Latitudeddff);//
+                //			///////////////////////////////////////////
+                for (i = 0; i < 2; i++) {
+                    LongLatidata.longitudess[i] = LongLatidata.longitude[i];
+                    LongLatidata.Truelongitude[i] = LongLatidata.longitude[i];
+                }
+                for (i = 2; i < 11; i++)
+                    LongLatidata.longitudedd[i - 2] = LongLatidata.longitude[i];
+                LongLatidata.longitudedd[i - 2] = 0;
+                LongLatidata.longitudeddff = strtod(LongLatidata.longitudedd, NULL);
+                LongLatidata.longitudeddff /= 60;
+                sprintf(LongLatidata.longitudeddtr, "%0.8f", LongLatidata.longitudeddff);
+                LongLatidata.longitudeddtr[10] = 0;
+                for (i = 1; i < 10; i++) {
+                    LongLatidata.Truelongitude[1 + i] = LongLatidata.longitudeddtr[i];
+                }
+                //	sprintf(LongLatidata.data_len,"%d",strlen(LongLatidata.buffer)/sizeof(char));//长度转成字符串
+                //		EC200S_TCPSend((u8*)LongLatidata.buffer);
+            }
+            memset(LongLatidata.buffer, 0, 200);
+
+            //  OLED_ShowString(18,0,"mzhLon:",8);
+            OLED_ShowString(22, 1, LongLatidata.TrueLatitude, 12);
+            // OLED_ShowString(18,3,"mzhLat:",8);
+            OLED_ShowString(22, 5, LongLatidata.Truelongitude, 12);
+            if (LongLatidata.RTKflag == '2')
+                OLED_ShowString(25, 6, "DIFF MDOE", 12);
+            else if (LongLatidata.RTKflag == '5')
+                OLED_ShowString(25, 6, "FLOAT RTK", 12);
+            else if (LongLatidata.RTKflag == '4')
+                OLED_ShowString(25, 6, "FIXED RTK", 12);
+        } else {
+            OLED_ShowString(25, 1, "000.000000", 12);
+            OLED_ShowString(25, 4, "00.000000", 12);
+            //	EC200S_TCPSend((u8*)"0000.00000");
+
+        }
+
+    }
+}
 
 void OLED_SHOWAHT20(void) {
 

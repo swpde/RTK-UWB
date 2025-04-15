@@ -61,6 +61,7 @@ extern DMA_HandleTypeDef hdma_usart4_tx;
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
+void Getdata_Change(void);
 
 /* USER CODE END EM */
 
