@@ -195,9 +195,9 @@ int main(void) {
 
     char buf[3];
     char buf2[12] = {0};
-    bool send_mirror= true ;
+    bool send_mirror = true;
 
-    uint8_t send_data[]= {0} ;
+    uint8_t send_data[] = {0};
     uint8_t output_data[] = {0};
 
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, 2000);
@@ -245,20 +245,16 @@ int main(void) {
 //            ringbuff_debug(&my_ringbuff);
 //            printf("#################   读取  读取 结束 读取  读取 #####################\n");
 
-            if (send_mirror)
-            {//            printf(main_buf);
+            if (send_mirror) {//            printf(main_buf);
                 int num_packets = ((lenght) + 194) / 195;
 //                SerialPacket packets[num_packets];
-                Command_Send_Data(main_buf, lenght,200);
+                Command_Send_Data(main_buf, lenght, 200);
 //                Command_Send_Data_t(main_buf, num_packets, lenght);
 
                 HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
 
-//                HAL_UART_Transmit_DMA(&huart2, main_buf, lenght);
-
-
             }
-            send_mirror= !send_mirror;
+            send_mirror = !send_mirror;
             Receive_Handle.Receive_End = 0;
             Receive_Handle.Receive_Count = 0;
             Receive_Handle.Receive_last_length = 0;
@@ -282,8 +278,6 @@ int main(void) {
     }
     /* USER CODE END 3 */
 }
-
-
 
 
 /**
@@ -354,16 +348,17 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
         ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
 
 //        如果收到了结束位，开始解析数据
-        if (Uart2_RxBuff[1] == 0x34) {
+        if (Uart2_RxBuff[1] == 0x04) {
             //数据长度错误
             if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
                 Receive_Handle.Receive_Count = 0;
                 Receive_Handle.Receive_last_length = 0;
                 Receive_Handle.Receive_End = 0;
+            } else {
+                Receive_Handle.Receive_Count = Uart2_RxBuff[2];
+                Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
+                Receive_Handle.Receive_End = 1;
             }
-            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
-            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
-            Receive_Handle.Receive_End = 1;
         } else {
             Receive_Handle.Receive_Count++;
         }
