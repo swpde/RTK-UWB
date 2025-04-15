@@ -237,10 +237,10 @@ uint8_t Command_Send_Data(uint8_t *send_data, uint16_t total_len, uint16_t chunk
     uint8_t packet_count = 0;
     uint8_t pid = 0;
     uint16_t remaining = 0;
-    uint16_t chunk_size = chunk_len-5;   // 每组大小
+    uint16_t chunk_size = chunk_len - 5;   // 每组大小
     uint16_t num_chunks = (total_len + chunk_size - 1) / chunk_size;
 
-    for (uint8_t i = 0; i < (uint8_t)num_chunks; i++) {
+    for (uint8_t i = 0; i < (uint8_t) num_chunks; i++) {
         uint16_t start = i * chunk_size;
         remaining = total_len - start;
         uint16_t copy_size = (remaining < chunk_size) ? remaining : chunk_size;
@@ -248,15 +248,15 @@ uint8_t Command_Send_Data(uint8_t *send_data, uint16_t total_len, uint16_t chunk
 
         uint8_t pkt[chunk_len];
         pkt[0] = 0x6B;
-        if (i == 0) pkt[1]= 0x02;
-        else if (i + 1 == num_chunks) pkt[1] =0x04;
+        if (i == 0) pkt[1] = 0x02;
+        else if (i + 1 == num_chunks) pkt[1] = 0x04;
         else pkt[1] = 0;
         pkt[2] = num_chunks;
         pkt[3] = pid++;
         pkt[4] = copy_size;
         // 安全复制数据
         memcpy(pkt + 5, send_data + start, copy_size);
-        HAL_UART_Transmit(&huart2, pkt, copy_size+5, 100);
+        HAL_UART_Transmit(&huart2, pkt, copy_size + 5, 100);
         HAL_Delay(100);
     }
 
@@ -284,6 +284,20 @@ uint8_t Command_Send_Data_t(uint8_t *send_data, uint8_t packets_num, uint16_t to
         HAL_Delay(100);
     }
     return packet_count;
+}
+
+uint8_t Command_Analysis_Data(uint8_t *receive_data, uint16_t total_len, uint16_t Receive_last_length) {
+    uint8_t copy_size = 0;
+    uint16_t chunk_size = 195;   // 每组要取大小
+    uint16_t num_chunks = (total_len + chunk_size - 1) / chunk_size;
+
+    for (uint8_t i = 0; i < (uint8_t) num_chunks; i++) {
+
+        if (i + 1 == num_chunks) copy_size = Receive_last_length;
+        else copy_size = chunk_size;
+        memcpy(receive_data + i * 195, receive_data + i * 200 + 5, copy_size);
+    }
+    return 1;
 }
 
 

@@ -148,6 +148,8 @@ void ring_buff_v1(uint8_t *command);
 
 void ring_buff_v2(struct ringbuff *my_ringbuff, const char *msg, int i);
 
+void master(bool send_mirror);
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -236,24 +238,18 @@ int main(void) {
 
 
         if (Receive_Handle.Receive_End == 1) {
-//            uint16_t lenght = 200 * Receive_Handle.Receive_Count + Receive_Handle.Receive_last_length;
-
-//            printf("#################   读取  读取 开始 读取  读取 #####################\n");
-//            ringbuff_debug(&my_ringbuff);
+//            uint16_t lenght = 200 *( Receive_Handle.Receive_Count-1) + Receive_Handle.Receive_last_length+5;
             uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
-//            printf("长度 %d ###\n",lenght);
-//            ringbuff_debug(&my_ringbuff);
-//            printf("#################   读取  读取 结束 读取  读取 #####################\n");
 
-            if (send_mirror) {//            printf(main_buf);
-                int num_packets = ((lenght) + 194) / 195;
-//                SerialPacket packets[num_packets];
-                Command_Send_Data(main_buf, lenght, 200);
-//                Command_Send_Data_t(main_buf, num_packets, lenght);
+            Command_Analysis_Data(main_buf, lenght, Receive_Handle.Receive_last_length);
+//            HAL_UART_Transmit_DMA(&huart3, main_buf, lenght);
 
-                HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
+            HAL_UART_Transmit(&huart3, main_buf, lenght, 500);
 
-            }
+
+//基站运行函数
+//            master(send_mirror);
+
             send_mirror = !send_mirror;
             Receive_Handle.Receive_End = 0;
             Receive_Handle.Receive_Count = 0;
@@ -277,6 +273,26 @@ int main(void) {
 
     }
     /* USER CODE END 3 */
+}
+
+void master(bool send_mirror) {
+
+//            printf("#################   读取  读取 开始 读取  读取 #####################\n");
+//            ringbuff_debug(&my_ringbuff);
+    uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
+//            printf("长度 %d ###\n",lenght);
+//            ringbuff_debug(&my_ringbuff);
+//            printf("#################   读取  读取 结束 读取  读取 #####################\n");
+
+    if (send_mirror) {//            printf(main_buf);
+        int num_packets = ((lenght) + 194) / 195;
+//                SerialPacket packets[num_packets];
+        Command_Send_Data(main_buf, lenght, 200);
+//                Command_Send_Data_t(main_buf, num_packets, lenght);
+
+        HAL_UART_Transmit(&huart1, main_buf, lenght, 500);
+
+    }
 }
 
 
@@ -350,18 +366,19 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 //        如果收到了结束位，开始解析数据
         if (Uart2_RxBuff[1] == 0x04) {
             //数据长度错误
-            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
-                Receive_Handle.Receive_Count = 0;
-                Receive_Handle.Receive_last_length = 0;
-                Receive_Handle.Receive_End = 0;
-            } else {
-                Receive_Handle.Receive_Count = Uart2_RxBuff[2];
-                Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
-                Receive_Handle.Receive_End = 1;
-            }
-        } else {
-            Receive_Handle.Receive_Count++;
+//            if (Uart2_RxBuff[2] != Receive_Handle.Receive_Count + 1) {
+//                Receive_Handle.Receive_Count = 0;
+//                Receive_Handle.Receive_last_length = 0;
+//                Receive_Handle.Receive_End = 0;
+//            } else
+//            {
+            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
+            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
+            Receive_Handle.Receive_End = 1;
         }
+//        } else {
+//            Receive_Handle.Receive_Count++;
+//        }
 //        ringbuff_getdata(&my_ringbuff,buf2,12);
 //        HAL_UART_Transmit_DMA(&huart2,buf2,sizeof (buf2));
 
