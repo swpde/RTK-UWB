@@ -414,7 +414,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
             {
                 //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
 //                printf("#################   写入  写入 开始 写入  写入 #####################\n");
-//                ringbuff_debug(&my_ringbuff);
+//                ringbuff_debug(&my_ringbuff);d
 //                printf("写入 %hu\n",Size);
 //                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
 //                ringbuff_debug(&my_ringbuff);
