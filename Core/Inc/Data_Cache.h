@@ -13,8 +13,11 @@ typedef struct
     uint8_t data[200];  // 数据载荷
 //    uint16_t crc16;     // CRC16校验
 } SerialPacket;
-uint16_t calc_crc16(const void* data, size_t len) ;
 
+// uint8_t Command_Handle_Buff[2000] = {0};        //数据数据
+
+uint8_t Command_Handle_Data(uint8_t *data, uint8_t length) ;
+uint16_t calc_crc16(const void* data, size_t len) ;
 uint8_t Command_Send_Data(uint8_t *input, int total_len, SerialPacket *output);
 uint8_t CommandBuffer_Write(uint8_t *data, uint8_t length);
 uint8_t CommandBuffer_GetCommand(uint8_t *command);

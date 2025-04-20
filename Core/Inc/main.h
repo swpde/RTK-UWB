@@ -34,7 +34,18 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 extern uint8_t Uart2_RxBuff[2000];		//数据数据
 extern uint8_t Uart3_RxBuff[2000];        //数据数据
+//extern uint8_t Command_Handle_Buff[2000];        //数据数据
+
 //extern uint8_t Uart4_RxBuff[2000];        //数据数据
+
+extern DMA_HandleTypeDef hdma_usart2_rx;
+extern DMA_HandleTypeDef hdma_usart2_tx;
+extern DMA_HandleTypeDef hdma_usart3_rx;
+extern DMA_HandleTypeDef hdma_usart3_tx;
+extern DMA_HandleTypeDef hdma_usart4_rx;
+extern DMA_HandleTypeDef hdma_usart4_tx;
+
+
 
 /* USER CODE END Includes */
 
