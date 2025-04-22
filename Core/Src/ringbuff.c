@@ -291,12 +291,20 @@ uint8_t Command_Analysis_Data(uint8_t *receive_data, uint16_t total_len, uint16_
     uint16_t chunk_size = 195;   // 每组要取大小
     uint16_t num_chunks = (total_len + chunk_size - 1) / chunk_size;
 
+    uint16_t send_size= (num_chunks-1)*195+Receive_last_length;
+    uint8_t send_data[send_size] ;
+
     for (uint8_t i = 0; i < (uint8_t) num_chunks; i++) {
 
         if (i + 1 == num_chunks) copy_size = Receive_last_length;
         else copy_size = chunk_size;
-        memcpy(receive_data + i * 195, receive_data + i * 200 + 5, copy_size);
+        memcpy(send_data + i * 195, receive_data + i * 200 + 5, copy_size);
+
     }
+
+    HAL_UART_Transmit(&huart1, send_data, send_size, 100);
+    HAL_Delay(50);
+    HAL_UART_Transmit(&huart3, send_data, send_size, 100);
     return 1;
 }
 
