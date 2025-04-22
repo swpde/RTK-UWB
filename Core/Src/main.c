@@ -54,7 +54,7 @@
 uint8_t aRxBuffer1, aRxBuffer2, aRxBuffer3, aRxBuffer4;            //接收数据存储变量
 uint8_t Uart1_RxBuff[100];        //数据数据
 uint8_t Uart1_Rx_Cnt = 0;        //长度
-uint8_t Uart2_RxBuff[2000] = {0};        //数据数据
+uint8_t Uart2_RxBuff[1000] = {0};        //数据数据
 uint8_t Uart2_Rx_Cnt = 0;        //长度
 uint8_t Uart3_RxBuff[2000] = {0};        //数据数据
 uint8_t Uart3_Rx_Cnt = 0;        //长度
@@ -77,7 +77,7 @@ struct {
     uint8_t Receive_Start;
     uint8_t Receive_Count;
     uint16_t Receive_last_length;
-    uint8_t uart3_getok;
+    uint8_t uart3_getok;   //为接收到gps数据
 } Receive_Handle;
 extern unsigned int DMArx_len;
 //GPS模块的经纬度数据值
@@ -241,9 +241,8 @@ int main(void) {
 
         if (Receive_Handle.Receive_End == 1) {
 //            uint16_t lenght = 200 *( Receive_Handle.Receive_Count-1) + Receive_Handle.Receive_last_length+5;
-            uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
-
-            Command_Analysis_Data(main_buf, lenght, Receive_Handle.Receive_last_length);
+//            uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
+//            Command_Analysis_Data(main_buf, lenght, Receive_Handle.Receive_last_length);
 //            HAL_UART_Transmit(&huart1, main_buf, lenght,500);
 //            HAL_Delay(50);
 //
@@ -273,10 +272,10 @@ int main(void) {
 //                }
                 Receive_Handle.uart3_getok = 0;
                 Getdata_Change();
-
-                memcpy(send_Lati_data,LongLatidata.TrueLatitude,50);
-                memcpy(send_Lati_data+50,LongLatidata.Truelongitude,50);
-
+                memcpy(send_Lati_data, LongLatidata.TrueLatitude, 50);
+                memcpy(send_Lati_data + 50, LongLatidata.Truelongitude, 50);
+                HAL_UART_Transmit_DMA(&huart2, send_Lati_data, 100);
+                num++;
                 //  Uart3_Rx_Cnt=0;
 //                //	memset(Uart3_RxBuff,0,2000);
 //                HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
@@ -287,7 +286,7 @@ int main(void) {
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
-        num++;
+
         sprintf(buf, "%d", num);
         OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
         HAL_Delay(500);
@@ -386,82 +385,47 @@ void SystemClock_Config(void) {
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
     char buf[3];
     char buf2[3];
-    //串口2接收回调函数（LORA回传差分信息 需要对数据进行解包）
-    if (huart == &huart2) {
+    //串口2接收 lora
+    if (huart->Instance == USART2) {
 
-//        uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-        ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
+        if (Size != 0) {
 
-//        如果收到了结束位，开始解析数据
-        if (Uart2_RxBuff[1] == 0x04) {
-            //数据长度错误
-            Receive_Handle.Receive_Count = Uart2_RxBuff[2];
-            Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
-            Receive_Handle.Receive_End = 1;
+//            HAL_UART_Transmit(&huart3, Uart2_RxBuff, Size, 100);
+//            HAL_UART_Transmit(&huart1,Uart2_RxBuff,Size,100);
+
+//            ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
+//
+//            //        如果收到了结束位，开始解析数据
+//            if (Uart2_RxBuff[1] == 0x04) {
+//                //数据长度错误
+//                Receive_Handle.Receive_Count = Uart2_RxBuff[2];
+//                Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
+//                Receive_Handle.Receive_End = 1;
+//            }
+
+            HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
+            __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+
         }
-//            HAL_UART_Transmit(&huart1, main_buf, Size,500);
-
-//        num_4g++;
-//        sprintf(buf, "%d", num_4g);
-//        OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
-
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
-        __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
-
     }
-    if (huart == &huart3)
+    //串口3接收 gps
+    if (huart->Instance == USART3) {
         if (Size != 0) {
             {
-                //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-//                printf("#################   写入  写入 开始 写入  写入 #####################\n");
-//                ringbuff_debug(&my_ringbuff);d
-//                printf("写入 %hu\n",Size);
 //                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
-//                ringbuff_debug(&my_ringbuff);
-//                printf("#################   写入  写入 结束 写入  写入 #####################\n");
                 Receive_Handle.uart3_getok = 1;
-//                Receive_Handle.Receive_End = 1;
-//        printf(Uart3_RxBuff);
-//        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
-//        send_data(uint8_t *input, int Size, SerialPacket *output);
-//
-//        send_data(uint8_t *data, uint32_t len)
-
-
-//                num_lc29++;
-//                sprintf(buf, "%d", num_lc29);
-//                OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
-
                 HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
                 __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
 
             }
         }
-//    if (huart == &huart4) {
-//        //uint8_t length = CommandBuffer_Write(Uart2_RxBuff, Size);
-//
-//        HAL_UART_Transmit_DMA(&huart2, Uart4_RxBuff, Size);
-////        OLED_ShowString(18, 5, "88", 8);
-//        HAL_UARTEx_ReceiveToIdle_DMA(&huart4, Uart4_RxBuff, 2000);
-////        __HAL_DMA_DISABLE_IT(&hdma_usart4_rx, DMA_IT_HT);
-//
-//    }
 
+    }
 }
 
-// 不定长数据接收完成回调函数
-//void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-//{
-//    if (huart->Instance == USART2)
-//    {
-//        // 使用DMA将接收到的数据发送回去
-//        HAL_UART_Transmit_DMA(&huart2, Uart2_RxBuff, Size);
-//        // 重新启动接收，使用Ex函数，接收不定长数据
-//        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
-//        // 关闭DMA传输过半中断（HAL库默认开启，但我们只需要接收完成中断）
-//        __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
-//    }
-//}
+
+
+
 /*************将原始数据解析出经纬度数据*******************/
 //$GNGGA,015032.000,3150.303376,N,11707.855089,E,1,22,1.91,197.8,M,-0.3,M,,*6B
 void Getdata_Change(void) {

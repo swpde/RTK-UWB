@@ -32,7 +32,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-extern uint8_t Uart2_RxBuff[2000];		//数据数据
+extern uint8_t Uart2_RxBuff[1000];		//数据数据
 extern uint8_t Uart3_RxBuff[2000];        //数据数据
 //extern uint8_t Command_Handle_Buff[2000];        //数据数据
 
