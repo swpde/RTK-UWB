@@ -263,6 +263,47 @@ uint8_t Command_Send_Data(uint8_t *send_data, uint16_t total_len, uint16_t chunk
     return packet_count;
 }
 
+
+/**
+ * @brief 由于lora限制单包数据不能超过260字节，否则会丢包，
+ *         所以将发送数据拆包
+ * @param send_data 要传入的数据指针
+ * @param total_len 要写入的数据总长度
+ * @param chunk_len 每组长度
+ * @param outputoutput 输出数据指针
+ * @return
+ */
+uint8_t Command_slave_Send_Data(uint8_t *send_data, uint16_t total_len, uint16_t chunk_len) {
+    uint8_t packet_count = 0;
+    uint8_t pid = 0;
+    uint16_t remaining = 0;
+    uint16_t chunk_size = chunk_len - 5;   // 每组大小
+    uint16_t num_chunks = (total_len + chunk_size - 1) / chunk_size;
+
+    for (uint8_t i = 0; i < (uint8_t) num_chunks; i++) {
+        uint16_t start = i * chunk_size;
+        remaining = total_len - start;
+        uint16_t copy_size = (remaining < chunk_size) ? remaining : chunk_size;
+
+
+        uint8_t pkt[chunk_len];
+        pkt[0] = 0x6B;
+        if (i == 0) pkt[1] = 0x02;
+        else if (i + 1 == num_chunks) pkt[1] = 0x04;
+        else pkt[1] = 0;
+        pkt[2] = num_chunks;
+        pkt[3] = pid++;
+        pkt[4] = copy_size;
+        // 安全复制数据
+        memcpy(pkt + 5, send_data + start, copy_size);
+        HAL_UART_Transmit(&huart2, pkt, copy_size + 5, 100);
+        HAL_Delay(100);
+    }
+
+    return packet_count;
+}
+
+
 //发送所有数据
 uint8_t Command_Send_Data_t(uint8_t *send_data, uint8_t packets_num, uint16_t total_len) {
     uint8_t packet_count = 0;

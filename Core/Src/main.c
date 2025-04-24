@@ -272,9 +272,12 @@ int main(void) {
 //                }
                 Receive_Handle.uart3_getok = 0;
                 Getdata_Change();
-                memcpy(send_Lati_data, LongLatidata.TrueLatitude, 50);
-                memcpy(send_Lati_data + 50, LongLatidata.Truelongitude, 50);
-                HAL_UART_Transmit_DMA(&huart2, send_Lati_data, 100);
+                send_Lati_data[0] = 0X41;
+                send_Lati_data[1] = 0X41;
+
+                memcpy(send_Lati_data + 2, LongLatidata.TrueLatitude, 50);
+                memcpy(send_Lati_data + 52, LongLatidata.Truelongitude, 50);
+                HAL_UART_Transmit_DMA(&huart2, send_Lati_data, 102);
                 num++;
                 //  Uart3_Rx_Cnt=0;
 //                //	memset(Uart3_RxBuff,0,2000);
@@ -289,7 +292,7 @@ int main(void) {
 
         sprintf(buf, "%d", num);
         OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
-        HAL_Delay(500);
+        HAL_Delay(800);
 //        HAL_UART_Transmit(&huart2,send_Lati_data,100,100);
 //        HAL_UART_Transmit(&huart1,send_Lati_data,100,100);
 
@@ -390,21 +393,20 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 
         if (Size != 0) {
 
-//            HAL_UART_Transmit(&huart3, Uart2_RxBuff, Size, 100);
-//            HAL_UART_Transmit(&huart1,Uart2_RxBuff,Size,100);
+            //流动站 接收消息剔除
+            if (Size < 200) {
+                memset(Uart2_RxBuff, 0, Size);
 
-//            ringbuff_putdata(&my_ringbuff, Uart2_RxBuff, Size);
-//
-//            //        如果收到了结束位，开始解析数据
-//            if (Uart2_RxBuff[1] == 0x04) {
-//                //数据长度错误
-//                Receive_Handle.Receive_Count = Uart2_RxBuff[2];
-//                Receive_Handle.Receive_last_length = Uart2_RxBuff[4];
-//                Receive_Handle.Receive_End = 1;
-//            }
+            }
+
+//            HAL_UART_Transmit(&huart3, Uart2_RxBuff, Size, 100);
+            HAL_UART_Transmit(&huart1, Uart2_RxBuff, Size, 100);
 
             HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
             __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+            num_lc29++;
+            sprintf(buf, "%d", num_lc29);
+            OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
 
         }
     }
@@ -416,6 +418,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
                 Receive_Handle.uart3_getok = 1;
                 HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
                 __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+
 
             }
         }
@@ -526,12 +529,117 @@ void Getdata_Change(void) {
     }
 }
 
+
+
+//
+void Get_SNR_data(void) {
+    unsigned char i;
+    char *strx;
+    char *p;
+    char json[] = "{lon:%d.%06d:lat:%d.%06d}";
+    memset(LongLatidata.GGAdata, 0, 100);
+    strx = strstr((const char *) Uart3_RxBuff, (const char *) "$GPGSV");//返回$GNGGA
+    if (strx) {
+        for (i = 0;; i++) {
+            if (strx[i + 1] == '$')
+                break;
+            LongLatidata.GGAdata[i] = strx[i];
+        }
+        LongLatidata.GGAdata[i] = 0;
+//        printf(LongLatidata.GGAdata);//mqtt send
+        strx = strstr((const char *) LongLatidata.GGAdata, (const char *) "N,");//返回N，表明经纬度数据被正确获取了
+        if (strx) {
+
+            memcpy(LongLatidata.buffer, LongLatidata.GGAdata, 100);
+            memset(LongLatidata.longitude, 0, 20);
+            memset(LongLatidata.Latitude, 0, 20);
+            memset(LongLatidata.Truelongitude, 0, 50);
+            memset(LongLatidata.TrueLatitude, 0, 50);
+            // printf(LongLatidata.buffer);
+            p = strtok(LongLatidata.buffer, ",");
+            p = strtok(NULL, ",");
+            p = strtok(NULL, ",");
+            // 	// //  Uart1_SendStr(p);
+            memset(LongLatidata.longitude, 0, 11);
+            memcpy(LongLatidata.longitude, p, 11);
+            //  printf(LongLatidata.longitude);
+            p = strtok(NULL, ",");
+            p = strtok(NULL, ",");
+            memset(LongLatidata.Latitude, 0, 13);
+            memcpy(LongLatidata.Latitude, p, 13);
+            //printf(LongLatidata.Latitude);
+            //	Uart1_SendStr(p);
+            strx = strstr((const char *) LongLatidata.GGAdata, (const char *) "E,");//返回E，读取纬度数据11702.5641
+            if (strx) {
+                LongLatidata.RTKflag = strx[2];
+                for (i = 0; i < 3; i++) {
+                    LongLatidata.Latitudess[i] = LongLatidata.Latitude[i];
+                    LongLatidata.TrueLatitude[i] = LongLatidata.Latitude[i];
+                }
+
+                for (i = 3; i < 13; i++)
+                    LongLatidata.Latitudedd[i - 3] = LongLatidata.Latitude[i];
+                LongLatidata.Latitudedd[i - 3] = 0;
+                //LongLatidata.Latitudeddff=atof(LongLatidata.Latitudedd);
+                LongLatidata.Latitudeddff = strtod(LongLatidata.Latitudedd, NULL);
+                LongLatidata.Latitudeddff /= 60;
+                sprintf(LongLatidata.Latitudeddtr, "%0.8f", LongLatidata.Latitudeddff);
+                LongLatidata.Latitudeddtr[10] = 0;
+                for (i = 1; i < 10; i++) {
+                    LongLatidata.TrueLatitude[2 + i] = LongLatidata.Latitudeddtr[i];
+                }
+
+                // sscanf(LongLatidata.Latitudedd,"%lf",&LongLatidata.Latitudeddff);//
+                //			///////////////////////////////////////////
+                for (i = 0; i < 2; i++) {
+                    LongLatidata.longitudess[i] = LongLatidata.longitude[i];
+                    LongLatidata.Truelongitude[i] = LongLatidata.longitude[i];
+                }
+                for (i = 2; i < 11; i++)
+                    LongLatidata.longitudedd[i - 2] = LongLatidata.longitude[i];
+                LongLatidata.longitudedd[i - 2] = 0;
+                LongLatidata.longitudeddff = strtod(LongLatidata.longitudedd, NULL);
+                LongLatidata.longitudeddff /= 60;
+                sprintf(LongLatidata.longitudeddtr, "%0.8f", LongLatidata.longitudeddff);
+                LongLatidata.longitudeddtr[10] = 0;
+                for (i = 1; i < 10; i++) {
+                    LongLatidata.Truelongitude[1 + i] = LongLatidata.longitudeddtr[i];
+                }
+                //	sprintf(LongLatidata.data_len,"%d",strlen(LongLatidata.buffer)/sizeof(char));//长度转成字符串
+                //		EC200S_TCPSend((u8*)LongLatidata.buffer);
+            }
+            memset(LongLatidata.buffer, 0, 200);
+
+            //  OLED_ShowString(18,0,"mzhLon:",8);
+            OLED_ShowString(22, 1, LongLatidata.TrueLatitude, 12);
+            // OLED_ShowString(18,3,"mzhLat:",8);
+            OLED_ShowString(22, 5, LongLatidata.Truelongitude, 12);
+            if (LongLatidata.RTKflag == '2')
+                OLED_ShowString(25, 6, "DIFF MDOE", 12);
+            else if (LongLatidata.RTKflag == '5')
+                OLED_ShowString(25, 6, "FLOAT RTK", 12);
+            else if (LongLatidata.RTKflag == '4')
+                OLED_ShowString(25, 6, "FIXED RTK", 12);
+        } else {
+            OLED_ShowString(25, 1, "000.000000", 12);
+            OLED_ShowString(25, 4, "00.000000", 12);
+            //	EC200S_TCPSend((u8*)"0000.00000");
+
+        }
+
+    }
+}
+
+
+
+//
+
 void OLED_SHOWAHT20(void) {
 
     OLED_ShowString(18, 0, "mzhLon:", 8);
     OLED_ShowString(18, 2, "4g", 8);
     OLED_ShowString(18, 4, "mzhLat:", 8);
-    OLED_ShowString(18, 7, "lc29", 8);
+    OLED_ShowString(18, 7, "lora", 8);
 
 }
 
