@@ -54,9 +54,9 @@
 uint8_t aRxBuffer1, aRxBuffer2, aRxBuffer3, aRxBuffer4;            //接收数据存储变量
 uint8_t Uart1_RxBuff[100];        //数据数据
 uint8_t Uart1_Rx_Cnt = 0;        //长度
-uint8_t Uart2_RxBuff[2000] = {0};        //数据数据
+uint8_t Uart2_RxBuff[1000];        //数据数据
 uint8_t Uart2_Rx_Cnt = 0;        //长度
-uint8_t Uart3_RxBuff[2000] = {0};        //数据数据
+uint8_t Uart3_RxBuff[1000];        //数据数据
 uint8_t Uart3_Rx_Cnt = 0;        //长度
 uint8_t Uart4_RxBuff[100];        //数据数据
 uint8_t Uart4_Rx_Cnt = 0;        //长度
@@ -66,7 +66,7 @@ uint8_t Uart4_Rx_Cnt = 0;        //长度
 static char main_buf[2000];
 
 
-int num_4g = 0;
+int num_lora = 0;
 int num_lc29 = 0;
 
 
@@ -96,6 +96,7 @@ struct {
     char buffer[200];
     char RTKflag;
     char GGAdata[100];
+    char Statusdata[100];
 //char ALLNEMAdata[2000];
 } LongLatidata;
 //#pragma  pack (1)
@@ -150,6 +151,8 @@ void ring_buff_v2(struct ringbuff *my_ringbuff, const char *msg, int i);
 
 void master(bool send_mirror);
 
+void show_rtk();
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -190,7 +193,7 @@ int main(void) {
 
     int num = 0;
     char buf[3];
-    bool send_mirror = true;
+    uint8_t send_mirror = 0;
 
     HAL_UARTEx_ReceiveToIdle_DMA(&huart4, Uart4_RxBuff, sizeof(Uart4_RxBuff));
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
@@ -207,44 +210,61 @@ int main(void) {
 
         /* USER CODE BEGIN 3 */
 
-
-
         if (Receive_Handle.Receive_End == 1) {
 
-            master(send_mirror);
+            if (send_mirror == 2) {
 
-            send_mirror = !send_mirror;
-            Receive_Handle.Receive_End = 0;
-            Receive_Handle.Receive_Count = 0;
-            Receive_Handle.Receive_last_length = 0;
+                uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
+                HAL_Delay(250);
+                HAL_UART_Transmit_DMA(&huart2, main_buf, lenght);
+                Receive_Handle.Receive_End = 0;
+                Receive_Handle.Receive_Count = 0;
+                Receive_Handle.Receive_last_length = 0;
+
+                //显示rtk是否进入收敛
+                show_rtk();
+            }
+            send_mirror++;
+            if (send_mirror == 3) send_mirror = 0;
+
+
 
         }
-
 
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
-        num++;
-        sprintf(buf, "%d", num);
-        OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
-        HAL_Delay(500);
+//        num++;
+//        sprintf(buf, "%d", num);
+//        OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
+        HAL_Delay(50);
 
 
     }
     /* USER CODE END 3 */
 }
 
-void master(bool send_mirror) {
+void show_rtk() {
+    char *strx;
+    char *p;
+    uint16_t i;
+    char num[2];
+    strx = strstr((const char *) Uart3_RxBuff, (const char *) "$PQTMSVINSTATUS");//返回$GNGGA
+    if (strx) {
+        for ( i = 0;; i++) {
+            if (strx[i + 1] == '*')
+                break;
+            LongLatidata.Statusdata[i] = strx[i];
+        }
+        LongLatidata.Statusdata[i] = 0;
+        p = strtok(strx, ",");
+        p = strtok(NULL, ",");
+        p = strtok(NULL, ",");
+        p = strtok(NULL, ",");
+        memcpy( &num , p, 1);
 
-
-    uint16_t lenght = ringbuff_getdata_all(&my_ringbuff, main_buf);
-
-
-    if (send_mirror) {//            printf(main_buf);
-        int num_packets = ((lenght) + 194) / 195;
-
-        Command_Send_Data(main_buf, lenght, 200);
-
+        if (num[0] == 92)
+            OLED_ShowString(25, 6, "FLOAT RTK", 12);
     }
 }
 
@@ -304,21 +324,28 @@ void SystemClock_Config(void) {
 
 /* USER CODE BEGIN 4 */
 
-
+// 串口接收完成（收到2个字节）中断回调函数
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+//    if (huart->Instance == USART2)
+//    {
+//
+//        // 将收到的数据返回（中断发送）
+////        HAL_UART_Transmit_IT(&huart2, Uart2_RxBuff, 2);
+//        // 重新开启中断接收
+//        HAL_UART_Receive_IT(&huart2, Uart2_RxBuff, 2);
+//    }
+}
 
 //串口空闲中断回调函数
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
-    char buf[12];
+    char buf[3];
 
-    //串口2接收回调函数（LORA回传差分信息 需要对数据进行解包）
-    if (huart == &huart2) {
+    //串口2接收回调函数
+    if (huart->Instance == USART2) {
 
-                HAL_UART_Transmit(&huart1, Uart2_RxBuff, Size,500);
-
-
-
-        num_4g++;
-        sprintf(buf, "%d", num_4g);
+        HAL_UART_Transmit(&huart1, Uart2_RxBuff, Size, 500);
+        num_lora++;
+        sprintf(buf, "%d", num_lora);
         OLED_ShowString(55, 2, (u8 *) buf, sizeof(buf));
 
         HAL_UARTEx_ReceiveToIdle_DMA(&huart2, Uart2_RxBuff, sizeof(Uart2_RxBuff));
@@ -326,23 +353,13 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 
     }
     //串口3  接收到差分数据 发送 给串口2 lorA
-    if (huart == &huart3)
+    if (huart->Instance == USART3)
         if (Size != 0) {
             {
-
-
-
-//                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
-        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
-
+                ringbuff_putdata(&my_ringbuff, Uart3_RxBuff, Size);
+                //串口1接收，打印调试
+//                HAL_UART_Transmit(&huart1, Uart3_RxBuff, Size, 100);
                 Receive_Handle.Receive_End = 1;
-//        printf(Uart3_RxBuff);
-//        HAL_UART_Transmit_DMA(&huart2, Uart3_RxBuff, Size);
-//        send_data(uint8_t *input, int Size, SerialPacket *output);
-//
-//        send_data(uint8_t *data, uint32_t len)
-
-
                 num_lc29++;
                 sprintf(buf, "%d", num_lc29);
                 OLED_ShowString(55, 7, (u8 *) buf, sizeof(buf));
@@ -364,7 +381,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 
 }
 
-// 不定长数据接收完成回调函数
+//// 不定长数据接收完成回调函数
 //void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 //{
 //    if (huart->Instance == USART2)
@@ -392,12 +409,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
 
 
     if (huart == &huart3) {
-
-
-//        memset(rx_buffer, 0, BUFFER_SIZE);     // 清空缓存（按需选择）
-// 解锁 UART 句柄
-//        __HAL_UNLOCK(huart);
-// 重新启动 UART 接收中断
         HAL_UARTEx_ReceiveToIdle_DMA(&huart3, Uart3_RxBuff, sizeof(Uart3_RxBuff));
         OLED_ShowString(80, 2, "er3", 8);
 
