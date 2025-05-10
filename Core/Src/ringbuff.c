@@ -15,12 +15,15 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "string.h"
+#include "user_protocol.h"
 
 #include <math.h>
 #include <usart.h>
 #include <malloc.h>
 
 static uint8_t buffer[2000];
+
+
 
 
 //返回剩余缓存大小
@@ -144,11 +147,11 @@ int8_t ringbuff_putdata(ringbuff_t p_rb, uint8_t *data, uint16_t length) {
     assert(p_rb != NULL);
     // 如果缓冲区不足 则不写入数据 返回0
     if (length == 0) {
-        printf("fail \n");
+//        printf("fail \n");
         return 0;
     }
     if ((ringbuff_data_space_len(p_rb)) < length) {
-        printf("fail \n");
+//        printf("fail \n");
         return 0;
     }
 
@@ -188,7 +191,7 @@ uint16_t ringbuff_getdata_all(ringbuff_t p_rb, uint8_t *data) {
 
     p_rb->exist = length;
     if (length == 0) {
-        printf("fail");
+//        printf("fail");
         return 0;
     }
     // 使用memcpy函数将缓冲区读出
@@ -316,4 +319,15 @@ void ringbuff_debug(ringbuff_t p_rb) {
 //    printf("exist = %d\n", p_rb->exist);
 
 //    printf("*************ringbuff debug*********************** end---\n");
+}
+
+void ringbuff_test( ) {
+//    uint16_t lenght = ringbuff_getdata_all(&my_ringbuf, main_buf);
+//
+//    if (uart_tx_busy) {
+//        Enqueue_Data(main_buf, lenght); // 入队
+//    } else {
+//
+//        HAL_UART_Transmit_DMA(&huart2, main_buf, lenght);
+//    }
 }

@@ -32,7 +32,9 @@ extern "C" {
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef huart1;
+//lora
 extern UART_HandleTypeDef huart2;
+//rtk
 extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart4;
 
@@ -47,6 +49,11 @@ void MX_USART4_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+void USART2_Callback(UART_HandleTypeDef *huart, uint16_t Size) ;
+void USART3_Callback(UART_HandleTypeDef *huart, uint16_t Size) ;
+
+
+uint8_t Safe_UART_2_Transmit_CheckBusy(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t len);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

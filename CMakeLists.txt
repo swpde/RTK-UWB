@@ -46,13 +46,19 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(Core/Inc Drivers/STM32G0xx_HAL_Driver/Inc Drivers/STM32G0xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32G0xx/Include Drivers/CMSIS/Include)
+include_directories(Core/Inc
+        Core/Inc
+        Drivers/STM32G0xx_HAL_Driver/Inc
+        Drivers/STM32G0xx_HAL_Driver/Inc/Legacy
+        Drivers/CMSIS/Device/ST/STM32G0xx/Include
+        Drivers/CMSIS/Include
+        Application )
 
 add_definitions(-DUSE_HAL_DRIVER -DSTM32G070xx)
 
-file(GLOB_RECURSE SOURCES "startup/*.*" "Drivers/*.*" "Core/*.*" "Core/Src/*.*"  "Core/Src/*.*"  )
+file(GLOB_RECURSE SOURCES "startup/*.*" "Drivers/*.*" "Core/*.*" "Core/Src/*.*"  "Application/*.*"  )
 
-set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32G070CBTx_FLASH.ld)
+set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32G070CBTx_FLASH.ld )
 
 add_link_options(-Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR}/${PROJECT_NAME}.map)
 add_link_options(-mcpu=cortex-m0 -mthumb -mthumb-interwork)
