@@ -28,12 +28,13 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdbool.h>
 #include "stm32g0xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-extern uint8_t Uart2_RxBuff[1000];		//数据数据
-extern uint8_t Uart3_RxBuff[2000];        //数据数据
+extern uint8_t G_Uart2_RxBuff[1000];		//数据数据
+extern uint8_t G_Uart3_RxBuff[2000];        //数据数据
 //extern uint8_t Command_Handle_Buff[2000];        //数据数据
 
 //extern uint8_t Uart4_RxBuff[2000];        //数据数据
@@ -45,6 +46,13 @@ extern DMA_HandleTypeDef hdma_usart3_tx;
 extern DMA_HandleTypeDef hdma_usart4_rx;
 extern DMA_HandleTypeDef hdma_usart4_tx;
 
+
+// DOP滤波器结构体
+typedef struct {
+    float hdop_history[5];  // HDOP历史数据窗口
+    float pdop_history[5];  // PDOP历史数据窗口
+    int index;                        // 当前写入位置
+} DOPFilter;
 
 
 /* USER CODE END Includes */
@@ -61,8 +69,10 @@ extern DMA_HandleTypeDef hdma_usart4_tx;
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-void Getdata_Change(void);
+void Getdata_gps(void);
+void Getdata_uwb(void);
 
+void Receive_handle(uint8_t *send_uart2);
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -70,7 +80,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 void OLED_SHOWAHT20();
-
+void init_filter(DOPFilter *filter);
+void update_filter(DOPFilter *filter, float hdop, float pdop);
+bool is_outdoor(DOPFilter *filter);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

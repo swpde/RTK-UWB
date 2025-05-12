@@ -118,7 +118,7 @@ void MX_USART2_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
-//    HAL_UARTEx_ReceiveToIdle_DMA(&huart2,Uart2_RxBuff,2000);
+//    HAL_UARTEx_ReceiveToIdle_DMA(&huart2,G_Uart2_RxBuff,2000);
 //    __HAL_DMA_DISABLE_IT(&hdma_usart2_rx,DMA_IT_HT);
   /* USER CODE END USART2_Init 2 */
 
@@ -151,7 +151,7 @@ void MX_USART3_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART3_Init 2 */
-//    HAL_UARTEx_ReceiveToIdle_DMA(&huart3,Uart3_RxBuff,2000);
+//    HAL_UARTEx_ReceiveToIdle_DMA(&huart3,G_Uart3_RxBuff,2000);
 //    __HAL_DMA_DISABLE_IT(&hdma_usart3_rx,DMA_IT_HT);
 
   /* USER CODE END USART3_Init 2 */
