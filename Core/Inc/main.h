@@ -35,6 +35,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 extern uint8_t G_Uart2_RxBuff[1000];		//数据数据
 extern uint8_t G_Uart3_RxBuff[2000];        //数据数据
+extern uint8_t G_Uart4_RxBuff[1000];		//数据数据
 //extern uint8_t Command_Handle_Buff[2000];        //数据数据
 
 //extern uint8_t Uart4_RxBuff[2000];        //数据数据
@@ -46,12 +47,14 @@ extern DMA_HandleTypeDef hdma_usart3_tx;
 extern DMA_HandleTypeDef hdma_usart4_rx;
 extern DMA_HandleTypeDef hdma_usart4_tx;
 
-
+#define WINDOW_SIZE   5     // 滤波窗口长度（5个历史点）
 // DOP滤波器结构体
 typedef struct {
-    float hdop_history[5];  // HDOP历史数据窗口
-    float pdop_history[5];  // PDOP历史数据窗口
-    int index;                        // 当前写入位置
+    float hdop[WINDOW_SIZE];    // 水平精度因子历史窗口
+    float pdop[WINDOW_SIZE];    // 位置精度因子历史窗口
+    float vdop[WINDOW_SIZE];    // 垂直精度因子历史窗口
+    uint8_t index;                        // 当前写入位置
+    uint8_t sat_count ;                   // 卫星数量
 } DOPFilter;
 
 
@@ -72,7 +75,7 @@ typedef struct {
 void Getdata_gps(void);
 void Getdata_uwb(void);
 
-void Receive_handle(uint8_t *send_uart2);
+void Receive_handle_signal_strength(uint8_t *send_uart2);
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -81,7 +84,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 void OLED_SHOWAHT20();
 void init_filter(DOPFilter *filter);
-void update_filter(DOPFilter *filter, float hdop, float pdop);
+void update_filter(DOPFilter *filter, float hdop, float pdop,float vdop,uint8_t sat_count);
 bool is_outdoor(DOPFilter *filter);
 /* USER CODE END EFP */
 

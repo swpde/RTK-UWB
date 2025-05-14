@@ -59,7 +59,7 @@ uint8_t G_Uart2_RxBuff[1000] = {0};        //数据数据
 uint8_t Uart2_Rx_Cnt = 0;        //长度
 uint8_t G_Uart3_RxBuff[2000] = {0};        //数据数据
 uint8_t Uart3_Rx_Cnt = 0;        //长度
-uint8_t Uart4_RxBuff[100];        //数据数据
+uint8_t G_Uart4_RxBuff[1000] = {0};        //数据数据
 uint8_t Uart4_Rx_Cnt = 0;        //长度
 //uint8_t Command_Handle_Buff[2000] = {0};        //数据数据
 
@@ -103,11 +103,13 @@ struct {
     char Truelongitude[15];//转换过数据
     char buffer[200];
     char RTKflag;
-    char pdop[5];     //三维位置精度
 
-    float hdop;
     uint8_t GpsStatus;  //gps状态
     uint8_t sat_count;  //卫星数量
+
+    float pdop;   //位置精度因子
+    float hdop;   //水平精度因子
+    float vdop;   //垂直精度因子
     char GGAdata[100];
 //char ALLNEMAdata[2000];
 } LongLatidata;
@@ -230,7 +232,7 @@ int main(void) {
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart2, G_Uart2_RxBuff, 2000);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, G_Uart3_RxBuff, 2000);
 //
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart4, Uart4_RxBuff, sizeof(Uart4_RxBuff));
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart4, G_Uart4_RxBuff, sizeof(G_Uart4_RxBuff));
     HAL_UARTEx_ReceiveToIdle_DMA(&huart3, G_Uart3_RxBuff, sizeof(G_Uart3_RxBuff));
 
 // 使用Ex函数，接收不定长数据
@@ -238,6 +240,7 @@ int main(void) {
 
 
 
+    static unsigned char ledState = 0;
 
 // 关闭DMA传输过半中断（HAL库默认开启，但我们只需要接收完成中断）
     // __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
@@ -252,6 +255,15 @@ int main(void) {
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
+
+
+        if (ledState == 0)
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+        else
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+        ledState = !ledState;
+
+
 
 // 预计算所需封包数
 //        const int num_packets = (sizeof (send_data) + 199) / 200;
@@ -268,13 +280,13 @@ int main(void) {
 
         /* USER CODE BEGIN 3 */
 
-        sprintf(buf, "%d", num);
-        OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
-        HAL_Delay(500);
+//        sprintf(buf, "%d", num);
+//        OLED_ShowString(90, 7, (u8 *) buf, sizeof(buf));
+//        HAL_Delay(500);
 //        HAL_UART_Transmit(&huart2,send_Lati_data,100,100);
 //        HAL_UART_Transmit(&huart1,send_Lati_data,100,100);
 
-//        HAL_Delay(250);
+        HAL_Delay(500);
 
 //        ringbuff_getdata(&my_ringbuff, main_buf, ringbuff_data_len(&my_ringbuff));
 //
@@ -350,11 +362,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
     if (huart->Instance == USART2) {
 
         if (Size != 0) {
-
-
             Prot_Slave_Reserve();
-
-
             HAL_UARTEx_ReceiveToIdle_DMA(&huart2, G_Uart2_RxBuff, sizeof(G_Uart2_RxBuff));
             __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
 
@@ -382,7 +390,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
                 Receive_Handle.uart4_getok = 1;
 
 
-                HAL_UARTEx_ReceiveToIdle_DMA(&huart4, Uart4_RxBuff, sizeof(Uart4_RxBuff));
+                HAL_UARTEx_ReceiveToIdle_DMA(&huart4, G_Uart4_RxBuff, sizeof(G_Uart4_RxBuff));
                 __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
 
             }
@@ -398,27 +406,20 @@ void Receive_handle_signal_strength(uint8_t *send_uart2) {
     {
         Receive_Handle.uart4_getok = 0;
         Receive_Handle.uart3_getok = 0;
-
-
-        update_filter(&filter, , );
-
+        Getdata_uwb();
+        Getdata_gps();
+        update_filter(&filter,LongLatidata.hdop ,LongLatidata.pdop,LongLatidata.vdop, LongLatidata.sat_count);
         // 获取判断结果
         bool result = is_outdoor(&filter);
-
         if (atoi(uwbdata.uwb_strength) > 50) {
-            Getdata_uwb();
             memcpy(send_uart2, uwbdata.uwb_x, sizeof(uwbdata.uwb_x));
             memcpy(send_uart2 + sizeof(uwbdata.uwb_x), uwbdata.uwb_y, sizeof(uwbdata.uwb_y));
             memcpy(send_uart2 + sizeof(uwbdata.uwb_y), uwbdata.uwb_z, sizeof(uwbdata.uwb_z));
-//            HAL_UART_Transmit_DMA(&huart2, send_uart2, 100);
-//                    num++;
 
         } else {
-            Getdata_gps();
             memcpy(send_uart2, LongLatidata.TrueLatitude, 50);
             memcpy(send_uart2 + 50, LongLatidata.Truelongitude, 50);
-//            HAL_UART_Transmit_DMA(&huart2, send_uart2, 100);
-//                    num++;
+
         }
     } else if (Receive_Handle.uart4_getok == 0 && Receive_Handle.uart3_getok) {
         Receive_Handle.uart3_getok = 0;
@@ -426,16 +427,13 @@ void Receive_handle_signal_strength(uint8_t *send_uart2) {
         memcpy(send_uart2, 0, 200);
         memcpy(send_uart2, LongLatidata.TrueLatitude, 15);
         memcpy(send_uart2 + 15, LongLatidata.Truelongitude, 15);
-//        HAL_UART_Transmit_DMA(&huart2, send_uart2, 30);
-//                num++;
     } else if (Receive_Handle.uart4_getok && Receive_Handle.uart3_getok == 0) {
         Receive_Handle.uart4_getok = 0;
         Getdata_uwb();
         memcpy(send_uart2, uwbdata.uwb_x, sizeof(uwbdata.uwb_x));
         memcpy(send_uart2 + sizeof(uwbdata.uwb_x), uwbdata.uwb_y, sizeof(uwbdata.uwb_y));
         memcpy(send_uart2 + sizeof(uwbdata.uwb_y), uwbdata.uwb_z, sizeof(uwbdata.uwb_z));
-//        HAL_UART_Transmit_DMA(&huart2, send_uart2, 100);
-//                num++;
+
     }
 }
 
@@ -481,12 +479,9 @@ void Getdata_gps(void) {
             memcpy(LongLatidata.Latitude, p, 13);
             p = strtok(NULL, ",");
             p = strtok(NULL, ",");
-            LongLatidata.GpsStatus = atoi(p);
+            LongLatidata.GpsStatus = atoi(p);    //获取gps是否定位
             p = strtok(NULL, ",");
-            LongLatidata.sat_count = atoi(p);
-            p = strtok(NULL, ",");
-            LongLatidata.hdop = atof(p);
-
+            LongLatidata.sat_count = atoi(p);       //获取gps当前卫星数量
 
             //printf(LongLatidata.Latitude);
             //	Uart1_SendStr(p);
@@ -549,21 +544,40 @@ void Getdata_gps(void) {
         }
 
     }
+ //获取 HDOP（水平精度） VDOP 以及 PDOP（位置精度）
+//    strx = strstr((const char *) G_Uart3_RxBuff, (const char *) "$GNGSA");//返回$GNGGA
+//    char data_buf[100];
+//    if (strx) {
+//        for (i = 0;; i++) {
+//            if (strx[i + 1] == '$')
+//                break;
+//            data_buf[i] = strx[i];
+//        }
+//    }
+//    p = strtok(data_buf, ",");
+//    for (uint8_t i_t; i_t < 15; i_t++ ) {
+//        p = strtok(NULL, ",");
+//    }
+//    LongLatidata.pdop = atoi(p);    //获取gps是否定位
+//    p = strtok(NULL, ",");
+//    LongLatidata.hdop = atoi(p);       //获取gps当前卫星数量
+//    p = strtok(NULL, ",");
+//    LongLatidata.vdop = atoi(p);       //获取gps当前卫星数量
+
 }
 
-
+//串口接收缓冲区 Uart4_RxBuff 中解析（UWB）设备的原始数据
 void Getdata_uwb(void) {
     char *rest; // 用于保存 strtok_s 的上下文
-    unsigned char i;
     char *strx;
     char *p;
-    char json[] = "{lon:%d.%06d:lat:%d.%06d}";
+
     memset(uwbdata.uwb_rawdata, 0, 100);
-    strx = strstr((const char *) Uart4_RxBuff, (const char *) "x");//
+    strx = strstr((const char *) G_Uart4_RxBuff, (const char *) "x");//
     if (strx) {
         uwbdata.uwb_flag = 1;
 
-        memcpy(uwbdata.uwb_rawdata, Uart4_RxBuff, sizeof(Uart4_RxBuff));
+        memcpy(uwbdata.uwb_rawdata, G_Uart4_RxBuff, sizeof(uwbdata.uwb_rawdata));
         memset(uwbdata.uwb_x, 0, 10);
         memset(uwbdata.uwb_y, 0, 10);
         memset(uwbdata.uwb_z, 0, 10);
@@ -577,9 +591,7 @@ void Getdata_uwb(void) {
         p = strtok_r(NULL, ",", &rest);
         p = strtok_r(NULL, ",", &rest);
         memcpy(uwbdata.uwb_z, p, 10);
-        p = strtok_r(NULL, ",", &rest);
-        p = strtok_r(NULL, ",", &rest);
-        memcpy(uwbdata.uwb_strength, p, 10);
+
 //        memcpy(uwbdata., p, 11);
 
     }
@@ -587,47 +599,52 @@ void Getdata_uwb(void) {
 
 // 初始化滤波器
 void init_filter(DOPFilter *filter) {
-    for(int i=0; i<WINDOW_SIZE; i++) {
-        filter->hdop_history[i] = 99.9;  // 用极大值初始化表示无效数据
-        filter->pdop_history[i] = 99.9;
+    for (int i = 0; i < WINDOW_SIZE; i++) {
+        filter->hdop[i] = 99.9;  // 用极大值初始化表示无效数据
+        filter->pdop[i] = 99.9;
+        filter->vdop[i] = 99.9;
     }
     filter->index = 0;
 }
-// 更新滤波器数据
-void update_filter(DOPFilter *filter, float hdop, float pdop) {
-    // 写入当前数据
-    filter->hdop_history[filter->index] = hdop;
-    filter->pdop_history[filter->index] = pdop;
 
-    // 循环移动索引
-    filter->index = (filter->index + 1) % WINDOW_SIZE;
+// 更新滤波器数据
+void update_filter(DOPFilter *filter, float hdop, float pdop,float vdop,uint8_t sat_count) {
+    // 写入当前数据
+    filter->hdop[filter->index] = hdop;
+    filter->pdop[filter->index] = pdop;
+    filter->vdop[filter->index] = vdop;
+    filter->sat_count =sat_count ;      // 循环移动索引
+    filter->index = (filter->index + 1) % WINDOW_SIZE;      // 循环移动索引
+
+
 }
 
 // 判断是否在室外（带窗口滤波）
 bool is_outdoor(DOPFilter *filter) {
-    float hdop_sum = 0, pdop_sum = 0;
-    int valid_count = 0;
+//卫星过少
+    if (filter->sat_count < 6 ) return false;
 
+    float hdop_sum = 0, pdop_sum = 0, vdop_sum = 0;
+    int valid_count = 0;
     // 计算窗口内有效数据的平均值
-    for(int i=0; i<WINDOW_SIZE; i++) {
-        if(filter->hdop_history[i] < 50 && filter->pdop_history[i] < 50) {
-            hdop_sum += filter->hdop_history[i];
-            pdop_sum += filter->pdop_history[i];
+    for (int i = 0; i < WINDOW_SIZE; i++) {
+        if (filter->hdop[i] < 50 && filter->pdop[i] < 50) {
+            hdop_sum += filter->hdop[i];
+            pdop_sum += filter->pdop[i];
+            vdop_sum += filter->vdop[i];
             valid_count++;
         }
     }
 
     // 需要至少3个有效数据点才进行判断
-    if(valid_count < 3) return false;
+    if (valid_count < 3) return false;
 
     float avg_hdop = hdop_sum / valid_count;
     float avg_pdop = pdop_sum / valid_count;
-
+    float avg_vdop = vdop_sum / valid_count;
     // 判断条件：HDOP < 2.5 且 PDOP < 5.0
-    return (avg_hdop < 2.5f && avg_pdop < 5.0f);
+    return (avg_hdop < 2.5f && avg_pdop < 2.5f && avg_vdop < 5.0f);
 }
-
-
 
 
 void OLED_SHOWAHT20(void) {
