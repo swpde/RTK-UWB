@@ -18,7 +18,6 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-
 #include "tim.h"
 
 /* USER CODE BEGIN 0 */
@@ -33,10 +32,10 @@ int tim_50ms =0 ;
 
 
 typedef struct {
-    uint8_t header;    // Ö¡Í·£¨0xAA55£©
-    uint8_t function;   // ¹¦ÄÜÂë
-    uint8_t slave_id;   // ´ÓÕ¾µØÖ·
-    uint8_t payload[2]; // ºÉÔØÊý¾Ý
+    uint8_t header;    // Ö¡Í·ï¿½ï¿½0xAA55ï¿½ï¿½
+    uint8_t function;   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    uint8_t slave_id;   // ï¿½ï¿½Õ¾ï¿½ï¿½Ö·
+    uint8_t payload[2]; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 } QueryFrame;
 
 
@@ -60,9 +59,9 @@ void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 6399;
+  htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 9999;
+  htim3.Init.Period = 65535;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -99,9 +98,9 @@ void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 6399;
+  htim6.Init.Prescaler = 7199;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 5999;
+  htim6.Init.Period =2999;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -191,7 +190,7 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 
 
 /**
- * @brief ´¦Àí TIM3 µÄ¶¨Ê±ÖÜÆÚµ½´ïÊÂ¼þ
+ * @brief ï¿½ï¿½ï¿½ï¿½ TIM3 ï¿½Ä¶ï¿½Ê±ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½Â¼ï¿½
  * @return void
  */
 void TIM3_PeriodElapsed_Callback(void) {
@@ -201,7 +200,7 @@ void TIM3_PeriodElapsed_Callback(void) {
 }
 
 /**
- * @brief ´¦Àí TIM6 µÄ¶¨Ê±ÖÜÆÚµ½´ïÊÂ¼þ
+ * @brief ï¿½ï¿½ï¿½ï¿½ TIM6 ï¿½Ä¶ï¿½Ê±ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½Â¼ï¿½
  * @return void
  */
 void TIM6_PeriodElapsed_Callback(void) {

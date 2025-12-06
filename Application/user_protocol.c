@@ -6,13 +6,16 @@
 #include "main.h"
 #include "user_protocol.h"
 #include "ringbuff.h"
+#include "stdlib.h"
+#include "stdio.h"
+
 
 //------------------- 配置参数 -------------------//
 // 从机参数
 #define SLAVE_ID 0 // 本设备ID
 
 // 主机参数
-#define MAX_SLAVES 7      // 最大从站数量
+#define MAX_SLAVES 5      // 最大从站数量
 #define POLL_INTERVAL 500 // 轮询间隔(ms)
 #define MAX_RETRIES 3     // 最大重试次数
 
@@ -33,6 +36,7 @@ typedef struct {
     uint8_t header;           // 帧头 0xAA55
     uint8_t function;         // 功能码
     uint8_t slave_id;         // 从站地址
+    uint8_t payload[30];
     char x_coord[15];         // X坐标 15B
     char y_coord[15];         // Y坐标 15B
     char z_coord[15];         // Z坐标 15B
@@ -55,8 +59,8 @@ SlaveDevice slave_list[MAX_SLAVES] = {
         {3, 0, 0, {0}},
         {4, 0, 0, {0}},
         {5, 0, 0, {0}},
-        {6, 0, 0, {0}},
-        {7, 0, 0, {0}},
+//        {6, 0, 0, {0}},
+//        {7, 0, 0, {0}},
 };
 
 volatile uint8_t current_slave = 0; // 当前轮询的从站索引
@@ -64,6 +68,7 @@ volatile uint8_t current_slave = 0; // 当前轮询的从站索引
 volatile uint8_t timer_tick = 0; // 定时器触发标志
 
 //------------------- 构造并发送查询帧 -------------------//
+//主站询问
 void Send_QueryFrame(UART_HandleTypeDef *huart, uint8_t slave_id) {
     UART_Frame frame = {
             .header = PROT_HEADER,
@@ -71,24 +76,18 @@ void Send_QueryFrame(UART_HandleTypeDef *huart, uint8_t slave_id) {
             .slave_id = slave_id,
     };
 
-    //    if (uart_tx_busy)
-    //    {
-    //        Enqueue_Data((uint8_t *)&frame, sizeof(frame)); // 入队
-    //    }
-    //    else
     {
-        HAL_UART_Transmit_DMA(&huart2, (uint8_t *) &frame, sizeof(frame));
-        uart_tx_busy = 1;
-    }
+        HAL_UART_Transmit_DMA(&huart2, (uint8_t *) &frame, 10);
 
-    // 更新从站状态
-//    slave_list[current_slave].last_comm_time = HAL_GetTick();
+    }
 }
 
-void Ack_QueryFrame(UART_HandleTypeDef *huart, uint8_t slave_id, uint8_t func) {
-    if (!uart_tx_busy) {
-        uart_tx_busy = 1;
-
+// 帧头1 + 功能码1 + ID1 + 荷载
+//主站询问 从站应答
+void Ack_QueryFrame(uint8_t slave_id, uint8_t func, uint8_t *send_uart2) {
+//    if (!uart_tx_busy)
+    {
+//        uart_tx_busy = 1;
 
         UART_Frame frame = {
                 .header = PROT_HEADER,
@@ -97,11 +96,13 @@ void Ack_QueryFrame(UART_HandleTypeDef *huart, uint8_t slave_id, uint8_t func) {
                 //                .payload = {0x01, 0x02} // 荷载
         };
 
+        memcpy(frame.payload, send_uart2, 30);
+
         // 发送原始字节流
-        HAL_UART_Transmit_DMA(huart, (uint8_t *) &frame, sizeof(frame));
+        HAL_UART_Transmit_DMA(&huart2, (uint8_t *) &frame, 35);
 
         // 更新从站状态
-        slave_list[current_slave].last_comm_time = HAL_GetTick();
+//        slave_list[current_slave].last_comm_time = HAL_GetTick();
     }
 }
 
@@ -130,6 +131,7 @@ void Maintain_SlaveList(void) {
     }
 }
 
+//主站发送
 void Prot_Master_Send(void) {
 
     Send_QueryFrame(&huart2, slave_list[current_slave].id); // 发送当前从站查询
@@ -137,20 +139,70 @@ void Prot_Master_Send(void) {
     //    Maintain_SlaveList(); // 维护从站列表状态
 }
 
-void Prot_Slave_Send(void) {
-}
 
-// 帧头1 + 功能码1 + ID1 + 荷载
-void Prot_Slave_Reserve(UART_HandleTypeDef *huart, uint16_t Size) {
+//主站接收
+void Prot_Master_receive(void) {
+
+    char json_buffer[256];
+    uint8_t rtk_data[256];
+    uint8_t uwb_data[256];
+    uint8_t send_uart2[200];
     // 验证帧头
-    if (G_Uart3_RxBuff[0] != PROT_HEADER)
+    if (G_Uart2_RxBuff[0] != PROT_HEADER)
         return;
     // 检查从站ID
-    if (G_Uart3_RxBuff[2] != SLAVE_ID)
+    // 解析功能码
+    uint8_t func_code = G_Uart2_RxBuff[1];
+
+    memcpy(json_buffer, 0, 250);
+    // 根据功能码执行操作
+    switch (func_code) {
+        case 0x03: // 主站查询
+        {
+//            Receive_handle(send_uart2);
+//            Ack_QueryFrame(SLAVE_ID,0x05,send_uart2);
+        }
+            break;
+        case 0x05: // 从站应答rtk
+        {
+            memcpy(uwb_data, 0, 45);
+            memcpy(rtk_data, G_Uart2_RxBuff + 3, 30);
+            generate_sensor_json(rtk_data, uwb_data, G_Uart2_RxBuff[2], 0, json_buffer, sizeof(json_buffer));
+            char *found_position = strstr(json_buffer, (const char *) "]}]}");
+            HAL_UART_Transmit(&huart4, json_buffer, found_position - json_buffer + 4, 50);
+
+        }
+            break;
+        case 0x07: // 从站应答uwb
+        {
+
+            generate_sensor_json(rtk_data, uwb_data, G_Uart2_RxBuff[2], 1, json_buffer, sizeof(json_buffer));
+            char *found_position = strstr(json_buffer, (const char *) "]}]}");
+
+            HAL_UART_Transmit(&huart4, json_buffer, found_position - json_buffer + 4, 50);
+
+        }
+            break;
+        default:
+            break;
+    }
+
+    //    Maintain_SlaveList(); // 维护从站列表状态
+}
+
+
+// 帧头1 + 功能码1 + ID1 + 荷载
+void Prot_Slave_Reserve(void) {
+    uint8_t send_uart2[200];
+    // 验证帧头
+    if (G_Uart2_RxBuff[0] != PROT_HEADER)
+        return;
+    // 检查从站ID
+    if (G_Uart2_RxBuff[2] != SLAVE_ID)
         return;
 
     // 解析功能码
-    uint8_t func_code = G_Uart3_RxBuff[1];
+    uint8_t func_code = G_Uart2_RxBuff[1];
 
     // 根据功能码执行操作
     switch (func_code) {
@@ -169,6 +221,10 @@ void Prot_Slave_Reserve(UART_HandleTypeDef *huart, uint16_t Size) {
             break;
         case 0x03: // 主站查询
         {
+//            Receive_handle_signal_strength(send_uart2);
+            Ack_QueryFrame(SLAVE_ID, 0x05, send_uart2);
+
+
         }
             break;
         default:
@@ -194,6 +250,52 @@ void Init_TX_Buffer(void) {
     p_tx_rb->write_mirror = 0;
     p_tx_rb->write_pos = 0;
 }
+
+static double parse_float(const uint8_t *data) {
+    char buffer[16]; // 15字节 + 终止符
+    memcpy(buffer, data, 15);
+    buffer[15] = '\0';
+    return atof(buffer);
+}
+
+void generate_sensor_json(
+
+        const uint8_t *rtk_data,    // 30字节：经度(15B) + 纬度(15B)
+        const uint8_t *uwb_data,    // 45字节：X(15B) + Y(15B) + Z(15B)
+        uint8_t id,
+        uint8_t indoor_flag,           // 室内标志位
+        char *output,               // 输出缓冲区
+        size_t buffer_size          // 缓冲区大小
+) {
+
+    char buffer[25]; // 15字节 + 终止符
+    float x, y;
+    // 解析数据（根据标志位决定是否清零）
+    double rtk_lon = indoor_flag ? 0.0 : parse_float(rtk_data);
+    double rtk_lat = indoor_flag ? 0.0 : parse_float(rtk_data + 15);
+    memcpy(buffer, G_Uart2_RxBuff+3, 25);
+    sscanf(buffer, "X,%f,Y,%f", &x, &y);
+
+    double uwb_x = indoor_flag ? x : 0.0;
+    double uwb_y = indoor_flag ? y : 0.0;
+    double uwb_z = indoor_flag ? parse_float(uwb_data + 30) : 0.0;
+
+    // 固定温度值（可根据需求修改）
+    const double temperature = 0.0;
+
+    // 生成 JSON（注意转义字符和格式对齐）
+    snprintf(output, buffer_size,
+             "{"
+             "\"id\":\"%d\","
+             "\"sens\":["
+             "{\"n\":\"RTK\",\"u\":\"deg\",\"v\":[%.8f,%.8f]}"
+             "]"
+             "}",
+             id,
+             rtk_lon, rtk_lat
+    );
+}
+
 
 //------------------- 接收数据处理 -------------------//
 // void USART2_IRQHandler(void) {
@@ -227,3 +329,4 @@ void Init_TX_Buffer(void) {
 //        }
 //    }
 //}
+

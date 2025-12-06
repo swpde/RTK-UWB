@@ -32,16 +32,17 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-extern uint8_t G_Uart2_RxBuff[1000];		//Êý¾ÝÊý¾Ý
-extern uint8_t G_Uart3_RxBuff[1000];        //Êý¾ÝÊý¾Ý
+extern uint8_t G_Uart2_RxBuff[1000];		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+extern uint8_t G_Uart3_RxBuff[1000];        //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+extern uint8_t G_Uart4_RxBuff[1000];        //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 extern volatile  uint16_t G_Num_4g ;
 extern volatile  uint16_t G_Num_lc29;
 extern volatile  uint8_t uart_tx_busy ;
 
-//extern uint8_t Command_Handle_Buff[2000];        //Êý¾ÝÊý¾Ý
+//extern uint8_t Command_Handle_Buff[2000];        //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-//extern uint8_t Uart4_RxBuff[2000];        //Êý¾ÝÊý¾Ý
+//extern uint8_t Uart4_RxBuff[2000];        //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;

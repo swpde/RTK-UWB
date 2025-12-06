@@ -32,9 +32,7 @@ extern "C" {
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef huart1;
-//lora
 extern UART_HandleTypeDef huart2;
-//rtk
 extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart4;
 

@@ -48,6 +48,7 @@ endif ()
 
 include_directories(Core/Inc
         Core/Inc
+        Core/Inc
         Drivers/STM32G0xx_HAL_Driver/Inc
         Drivers/STM32G0xx_HAL_Driver/Inc/Legacy
         Drivers/CMSIS/Device/ST/STM32G0xx/Include
